@@ -104,7 +104,7 @@ class Writer:
         self._imports: list[str] = []
         self._add_import("from __future__ import annotations")
         self._add_import(
-            "from capnp.lib.capnp import _DynamicCapabilityClient, _DynamicCapabilityServer, _DynamicStructBuilder, _DynamicStructReader, _DynamicListBuilder, _DynamicListReader, _DynamicObjectBuilder, _DynamicObjectReader, _InterfaceModule, _Request, _StructModule"
+            "from capnp.lib.capnp import _DynamicCapabilityClient, _DynamicCapabilityServer, _DynamicEnum, _DynamicStructBuilder, _DynamicStructReader, _DynamicListBuilder, _DynamicListReader, _DynamicObjectBuilder, _DynamicObjectReader, _InterfaceModule, _Request, _StructModule"
         )
 
         self._typing_imports: set[Writer.VALID_TYPING_IMPORTS] = set()
@@ -601,8 +601,12 @@ class Writer:
         elif len(field.type_hints) > 1 and any(".Server" in str(h) for h in field.type_hints):
             getter_type = field.primary_type_nested  # Protocol only
             setter_type = field.full_type_nested  # Protocol | Server
+        elif field.has_type_hint_with_reader_affix and not field.has_type_hint_with_builder_affix:
+            # Enum fields: Builder getter/setter use the enum type alias (int | Literal[...])
+            getter_type = field.primary_type_nested
+            setter_type = None
         else:
-            # Primitive and enum fields (including primitive lists)
+            # Primitive fields (including primitive lists)
             getter_type = field.primary_type_nested
             # For Builder properties with list types, use MutableSequence
             if "Sequence[" in getter_type:
@@ -846,11 +850,13 @@ class Writer:
                 type_hints = [helper.TypeHint(field_type, primary=True), helper.TypeHint("None")]
             else:
                 # Get the type suitable for initialization (Builder types for struct fields)
-                field_type = (
-                    slot_field.get_type_with_affixes(["Builder"])
-                    if slot_field.has_type_hint_with_builder_affix
-                    else slot_field.full_type_nested
-                )
+                if slot_field.has_type_hint_with_builder_affix:
+                    field_type = slot_field.get_type_with_affixes(["Builder"])
+                elif slot_field.has_type_hint_with_reader_affix and not slot_field.has_type_hint_with_builder_affix:
+                    # Enum fields: use primary type alias (int | Literal[...]) for init params
+                    field_type = slot_field.primary_type_nested
+                else:
+                    field_type = slot_field.full_type_nested
                 # For struct fields, also accept dict for initialization
                 type_hints = [helper.TypeHint(field_type, primary=True)]
                 if slot_field.has_type_hint_with_builder_affix:
@@ -1477,12 +1483,29 @@ class Writer:
             except NoParentError:
                 pass
 
-        # Enum values are integers at runtime, but also accept string literals
+        # Enum values are integers at runtime, but also accept string literals.
+        # Reading an enum field from a Reader/Builder returns a _DynamicEnum instance,
+        # while setting accepts int | Literal[...] (the type alias).
         try:
             type_name = self.get_type_name(field.slot.type)
+
+            # Build _DynamicEnum[Literal["val1", "val2", ...]] for the reader type
+            # Get enum values directly from the schema (works for cross-module enums too)
+            reader_enum_type = "_DynamicEnum"
+            try:
+                enum_values = [e.name for e in schema.node.enum.enumerants]
+                if enum_values:
+                    literal_values = ", ".join(f'"{v}"' for v in enum_values)
+                    reader_enum_type = f"_DynamicEnum[Literal[{literal_values}]]"
+            except (AttributeError, TypeError):
+                pass
+
             return helper.TypeHintedVariable(
                 helper.sanitize_name(field.name),
-                [helper.TypeHint(type_name, primary=True)],
+                [
+                    helper.TypeHint(type_name, primary=True),
+                    helper.TypeHint(reader_enum_type, affix=helper.READER_NAME, flat_alias=True),
+                ],
             )
         except (AttributeError, TypeError):
             # Fallback if we can't get enumerants
