@@ -2110,15 +2110,15 @@ class Writer:
         # Phase 1: Setup and initialization
         context, protocol_declaration = self._setup_struct_generation(schema, type_name)
         if context is None:
-            # Already imported or skipped due to missing parent scope
-            # Try to return the already registered type if available
-            try:
-                return self.get_type_by_id(schema.node.id)
-            except KeyError:
-                # In the NoParentError case, we need to register and return
-                if not type_name:
-                    type_name = helper.get_display_name(schema)
-                return self.register_type(schema.node.id, schema, name=type_name, scope=self.scope.root)
+            # Already imported or skipped due to missing parent scope.
+            # Check the type_map directly to avoid re-entering generate_nested
+            # (get_type_by_id may call generate_nested → gen_struct → infinite loop).
+            if schema.node.id in self.type_map:
+                return self.type_map[schema.node.id]
+            # In the NoParentError case, we need to register and return
+            if not type_name:
+                type_name = helper.get_display_name(schema)
+            return self.register_type(schema.node.id, schema, name=type_name, scope=self.scope.root)
 
         # Register TypeAliases early so they're available during field processing
         # This handles self-referential fields and forward references
