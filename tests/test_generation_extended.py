@@ -95,3 +95,26 @@ def test_imports_cross_module_reference():
     assert any(line.startswith("from ") and "import _SharedStructModule" in line for line in user_lines) or any(
         line.startswith("from ") and "SharedReader" in line for line in user_lines
     )
+
+
+def test_cross_module_nested_enum_uses_flat_alias():
+    """Cross-module nested enum references should use flat type aliases, not dotted variable paths."""
+    user_stub = generated_dir / "import_user_capnp.pyi"
+    user_content = user_stub.read_text()
+    user_lines = _read(user_stub)
+
+    # Should import the flat alias from the base module
+    assert "SharedStatusEnum" in user_content, "Should import SharedStatusEnum flat alias"
+
+    # Should NOT use dotted variable path like Shared.Status
+    assert "Shared.Status" not in user_content, "Should not use Shared.Status variable path"
+
+    # Reader getter should return _DynamicEnum[Literal[...]]
+    assert any("def status(self) -> _DynamicEnum[" in line for line in user_lines), (
+        "Reader getter should return _DynamicEnum[Literal[...]]"
+    )
+
+    # Builder setter should accept the flat alias
+    assert any("def status(self, value: SharedStatusEnum" in line for line in user_lines), (
+        "Builder setter should accept SharedStatusEnum"
+    )

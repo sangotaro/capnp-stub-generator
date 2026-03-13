@@ -121,9 +121,11 @@ class TestDummyGroupsAndNested:
         assert any("NestedEnum1: _NestedEnum1EnumModule" in line for line in lines)
         assert any("NestedEnum2: _NestedEnum2EnumModule" in line for line in lines)
         assert any("class _TestUsingStructModule(_StructModule):" in line for line in lines)
-        # Enum fields now return the Enum type alias
-        assert any("def outerNestedEnum(self) -> TestNestedTypesNestedEnum1Enum" in line for line in lines)
-        assert any("def innerNestedEnum(self) -> TestNestedTypesNestedStructNestedEnum2Enum" in line for line in lines)
+        # Enum getter returns _DynamicEnum[Literal[...]], setter uses the Enum type alias
+        assert any("def outerNestedEnum(self) -> _DynamicEnum[" in line for line in lines)
+        assert any("def innerNestedEnum(self) -> _DynamicEnum[" in line for line in lines)
+        assert any("def outerNestedEnum(self, value: TestNestedTypesNestedEnum1Enum" in line for line in lines)
+        assert any("def innerNestedEnum(self, value: TestNestedTypesNestedStructNestedEnum2Enum" in line for line in lines)
 
     def test_using_type_aliases_resolved(self, dummy_stub_lines):
         lines = dummy_stub_lines

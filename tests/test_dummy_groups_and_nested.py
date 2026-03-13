@@ -35,9 +35,11 @@ def test_nested_types_enums_and_lists(dummy_stub_lines):
     assert any("NestedEnum2: _NestedEnum2EnumModule" in line for line in lines)
     # Using declarations produce aliases or reexports
     assert any("class _TestUsingStructModule(_StructModule):" in line for line in lines)
-    # Fields referencing nested enums now return the Enum type alias
-    assert any("def outerNestedEnum(self) -> TestNestedTypesNestedEnum1Enum" in line for line in lines)
-    assert any("def innerNestedEnum(self) -> TestNestedTypesNestedStructNestedEnum2Enum" in line for line in lines)
+    # Enum getter returns _DynamicEnum[Literal[...]], setter uses the Enum type alias
+    assert any("def outerNestedEnum(self) -> _DynamicEnum[" in line for line in lines)
+    assert any("def innerNestedEnum(self) -> _DynamicEnum[" in line for line in lines)
+    assert any("def outerNestedEnum(self, value: TestNestedTypesNestedEnum1Enum" in line for line in lines)
+    assert any("def innerNestedEnum(self, value: TestNestedTypesNestedStructNestedEnum2Enum" in line for line in lines)
 
 
 def test_using_type_aliases_resolved(dummy_stub_lines):

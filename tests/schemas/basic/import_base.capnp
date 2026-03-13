@@ -2,4 +2,12 @@
 
 struct Shared {
   value @0 :Text;
+
+  enum Status {
+    active @0;
+    inactive @1;
+    pending @2;
+  }
+
+  status @1 :Status;
 }

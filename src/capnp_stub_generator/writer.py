@@ -602,9 +602,10 @@ class Writer:
             getter_type = field.primary_type_nested  # Protocol only
             setter_type = field.full_type_nested  # Protocol | Server
         elif field.has_type_hint_with_reader_affix and not field.has_type_hint_with_builder_affix:
-            # Enum fields: Builder getter/setter use the enum type alias (int | Literal[...])
-            getter_type = field.primary_type_nested
-            setter_type = None
+            # Enum fields: getter returns _DynamicEnum[Literal[...]] (same as Reader),
+            # setter accepts the type alias (int | Literal[...])
+            getter_type = field.get_type_with_affixes([helper.READER_NAME])
+            setter_type = field.primary_type_nested
         else:
             # Primitive fields (including primitive lists)
             getter_type = field.primary_type_nested
@@ -1534,6 +1535,12 @@ class Writer:
             # Try to register as an import first, then generate if needed
             imported = self.register_import(schema)
             if imported is None:
+                # If the parent scope is not yet generated, generate it first
+                # This handles cases where a struct references a nested type
+                # whose parent struct hasn't been generated yet
+                parent_scope_id = schema.node.scopeId
+                if parent_scope_id not in self.scopes_by_id and parent_scope_id != self._module.schema.node.id:
+                    self._ensure_parent_scope_generated(parent_scope_id)
                 _ = self.gen_struct(schema)
 
         type_name = self.get_type_name(field.slot.type)
@@ -3932,8 +3939,12 @@ class Writer:
                         schema.node.id, schema, name=protocol_definition_name, scope=self.scope.root
                     )
                 else:
-                    self._add_import(f"from {python_import_path} import {root_name}")
-                    return self.register_type(schema.node.id, schema, name=definition_name, scope=self.scope.root)
+                    # For nested enums, use the flat type alias from the other module
+                    # E.g., "CarParams.SafetyModel" -> "CarParamsSafetyModelEnum"
+                    parts = definition_name.split(".")
+                    alias_name = "".join(parts) + "Enum"
+                    self._add_import(f"from {python_import_path} import {alias_name}")
+                    return self.register_type(schema.node.id, schema, name=alias_name, scope=self.scope.root)
         else:
             # Regular non-nested import
             node_type = schema.node.which()
@@ -4016,6 +4027,35 @@ class Writer:
         """
         return type_id in self.type_map
 
+    def _ensure_parent_scope_generated(self, parent_scope_id: int) -> None:
+        """Ensure the parent struct's scope exists by generating it if needed.
+
+        When a nested type is referenced before its parent struct has been generated,
+        the parent's scope won't be in scopes_by_id yet. This method finds and generates
+        the parent struct so the nested type can be properly scoped.
+
+        Args:
+            parent_scope_id: The node ID of the parent struct whose scope is needed.
+        """
+        for _, (_, module) in self._module_registry.items():
+            def find_schema_by_id(schema_obj: _ParsedSchema, target_id: int) -> _ParsedSchema | None:
+                if schema_obj.node.id == target_id:
+                    return schema_obj
+                for nested_node in schema_obj.node.nestedNodes:
+                    try:
+                        nested_schema = schema_obj.get_nested(nested_node.name)
+                        found = find_schema_by_id(nested_schema, target_id)
+                        if found:
+                            return found
+                    except Exception:
+                        pass
+                return None
+
+            parent_schema = find_schema_by_id(module.schema, parent_scope_id)
+            if parent_schema and not self.is_type_id_known(parent_scope_id):
+                self.generate_nested(parent_schema)
+                return
+
     def get_type_by_id(self, type_id: int) -> CapnpType:
         """Look up a type in the type registry, by means of its ID.
 
@@ -4052,6 +4092,10 @@ class Writer:
                 # Found it!
                 # If it's in the current module, generate it
                 if module_id == self._module.schema.node.id:
+                    # Ensure the parent scope exists before generating the nested type
+                    parent_scope_id = found_schema.node.scopeId
+                    if parent_scope_id not in self.scopes_by_id and parent_scope_id != module.schema.node.id:
+                        self._ensure_parent_scope_generated(parent_scope_id)
                     self.generate_nested(found_schema)
                 else:
                     # If it's in another module, register it as an import

@@ -5,4 +5,5 @@ using Base = import "import_base.capnp";
 struct UsesImport {
   shared @0 :Base.Shared;
   others @1 :List(Base.Shared);
+  status @2 :Base.Shared.Status;
 }
