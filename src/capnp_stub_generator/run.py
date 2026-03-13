@@ -551,21 +551,25 @@ def _augment_dynamic_object_reader(
             module_name = return_parts[capnp_idx]  # "management_capnp"
             reader_builder = return_parts[-1]  # "Reader" or "Builder"
 
-            # Get the last module part (the actual struct we're returning)
-            last_module = return_parts[-2]  # "_AvgSoilTempModule"
+            # Build qualified flat name from all module parts (not just the last one)
+            # e.g., ["_RestorerInterfaceModule", "_RestoreParamsStructModule"] -> "RestorerRestoreParams"
+            module_parts = return_parts[capnp_idx + 1 : -1]  # Everything between capnp module and Reader/Builder
 
-            # Convert _XxxModule to Xxx
-            if last_module.startswith("_"):
-                if last_module.endswith("StructModule"):
-                    struct_name = last_module[1:-12]  # Strip _ and StructModule
-                elif last_module.endswith("InterfaceModule"):
-                    struct_name = last_module[1:-15]  # Strip _ and InterfaceModule
-                elif last_module.endswith("Module"):
-                    struct_name = last_module[1:-6]  # Strip _ and Module (fallback)
-                else:
-                    struct_name = last_module[1:]  # Just strip _
+            def _extract_name(part: str) -> str:
+                if not part.startswith("_"):
+                    return part
+                if part.endswith("StructModule"):
+                    return part[1:-12]
+                elif part.endswith("InterfaceModule"):
+                    return part[1:-15]
+                elif part.endswith("Module"):
+                    return part[1:-6]
+                return part[1:]
 
-                alias_name = f"{struct_name}{reader_builder}"  # "AvgSoilTempReader"
+            qualified_name = "".join(_extract_name(p) for p in module_parts)
+
+            if qualified_name:
+                alias_name = f"{qualified_name}{reader_builder}"
                 clean_return = f"{module_name}.{alias_name}"
             else:
                 # Fallback to full path

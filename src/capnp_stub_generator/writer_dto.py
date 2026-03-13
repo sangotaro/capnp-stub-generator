@@ -94,6 +94,8 @@ class StructGenerationContext:
         _: str,
         new_type: CapnpType,
         registered_params: list[str],
+        *,
+        qualified_flat_name: str | None = None,
     ) -> StructGenerationContext:
         """Factory method for Protocol-based struct generation.
 
@@ -103,15 +105,19 @@ class StructGenerationContext:
             protocol_class_name: The Protocol class name (e.g., "_SimplePrimitivesModule")
             new_type: The registered type object (with Protocol name)
             registered_params: Generic type parameters
+            qualified_flat_name: Qualified name with parent prefixes for TypeAlias
+                (e.g., "ManagerStateProcessState" for ManagerState.ProcessState).
+                If None, uses user_type_name.
 
         Returns:
             A fully initialized StructGenerationContext
         """
         from capnp_stub_generator import helper
 
-        # For TypeAlias names, use the user-facing name
-        reader_type_name = helper.new_reader_flat(user_type_name)
-        builder_type_name = helper.new_builder_flat(user_type_name)
+        # For TypeAlias names, use the qualified flat name to avoid collisions
+        alias_base = qualified_flat_name or user_type_name
+        reader_type_name = helper.new_reader_flat(alias_base)
+        builder_type_name = helper.new_builder_flat(alias_base)
 
         # For scoped names, use the Protocol-based scoped_name directly
         # new_type.scoped_name is already the full Protocol path

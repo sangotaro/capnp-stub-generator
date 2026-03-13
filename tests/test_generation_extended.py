@@ -97,6 +97,35 @@ def test_imports_cross_module_reference():
     )
 
 
+def test_nested_struct_alias_collision():
+    """Nested structs with the same name in different parents must have unique type aliases."""
+    stub_path = _get_stub_path("nested_collision.capnp")
+    content = stub_path.read_text()
+
+    # Both should have parent-qualified alias names
+    assert "ManagerStateProcessStateReader" in content, (
+        "ManagerState.ProcessState should generate ManagerStateProcessStateReader"
+    )
+    assert "ManagerStateProcessStateBuilder" in content, (
+        "ManagerState.ProcessState should generate ManagerStateProcessStateBuilder"
+    )
+    assert "DebugInfoProcessStateReader" in content, (
+        "DebugInfo.ProcessState should generate DebugInfoProcessStateReader"
+    )
+    assert "DebugInfoProcessStateBuilder" in content, (
+        "DebugInfo.ProcessState should generate DebugInfoProcessStateBuilder"
+    )
+
+    # The unqualified short names should NOT exist as top-level type aliases
+    # (they would be ambiguous)
+    lines = _read(stub_path)
+    for line in lines:
+        if line.strip().startswith("type "):
+            assert not re.match(r"^type ProcessState(Reader|Builder)\b", line.strip()), (
+                f"Found unqualified ProcessState alias: {line.strip()}"
+            )
+
+
 def test_cross_module_nested_enum_uses_flat_alias():
     """Cross-module nested enum references should use flat type aliases, not dotted variable paths."""
     user_stub = generated_dir / "import_user_capnp.pyi"

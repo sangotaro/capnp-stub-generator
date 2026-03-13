@@ -13,7 +13,7 @@ just like Builder and Reader types.
 #     ...
 
 # This makes type annotations much more readable and consistent with Builder/Reader patterns:
-# - calculator_capnp.ExpressionBuilder  (was already available)
+# - calculator_capnp.CalculatorExpressionBuilder  (was already available)
 # - calculator_capnp.ExpressionReader   (was already available)
 # - calculator_capnp.EvaluateResult     (now available!)
 
@@ -35,7 +35,7 @@ def example_usage():
         value = result.value  # type: float
         print(f"Read value: {value}")
 
-    def process_expression(expr: calculator_capnp.ExpressionBuilder) -> calculator_capnp.EvaluateResult:
+    def process_expression(expr: calculator_capnp.CalculatorExpressionBuilder) -> calculator_capnp.EvaluateResult:
         """
         Example showing Result types work alongside Builder/Reader types.
 

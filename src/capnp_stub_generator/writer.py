@@ -30,7 +30,7 @@ from capnp_stub_generator.writer_dto import (
 if TYPE_CHECKING:
     from capnp.lib.capnp import _CapnpModuleType  # pyright: ignore[reportPrivateUsage]
 
-    from tests._generated.capnp.schema_capnp import FieldReader, NestedNodeReader, NodeReader, TypeReader
+    from tests._generated.capnp.schema_capnp import FieldReader, NodeNestedNodeReader, NodeReader, TypeReader
 
 capnp.remove_import_hook()
 
@@ -185,6 +185,27 @@ class Writer:
         """
         return f"{base_type}.Reader"
 
+    def _build_qualified_flat_name(self, module_type: str) -> str:
+        """Build a qualified flat name from a module type path by extracting all components.
+
+        E.g., "_ManagerStateStructModule._ProcessStateStructModule" -> "ManagerStateProcessState"
+        E.g., "_PersonStructModule" -> "Person"
+
+        Args:
+            module_type: The module type path
+
+        Returns:
+            The qualified flat name with all parent prefixes
+        """
+        parts = module_type.split(".")
+        name_parts = []
+        for part in parts:
+            if part.startswith("_"):
+                name_parts.append(self._extract_name_from_protocol(part))
+            else:
+                name_parts.append(part)
+        return "".join(name_parts)
+
     def _get_flat_builder_alias(self, module_type: str) -> str | None:
         """Convert a module type path to its flat Builder alias name if defined in this module.
 
@@ -192,21 +213,15 @@ class Writer:
             module_type: The module type path (e.g., "_CalculatorModule._ExpressionModule")
 
         Returns:
-            The flat Builder alias name if the type is defined in this module (e.g., "ExpressionBuilder"),
+            The flat Builder alias name if the type is defined in this module (e.g., "CalculatorExpressionBuilder"),
             or None if the type is imported from another module
         """
-        # Extract the last component (e.g., "_ExpressionStructModule")
-        last_part = module_type.split(".")[-1]
-        # Remove "_" prefix and "Module" suffix to get the base name
-        if last_part.startswith("_"):
-            base_name = self._extract_name_from_protocol(last_part)
-            alias_name = helper.new_builder_flat(base_name)
-            # Check if this alias is defined in the current module
-            if alias_name in self._all_type_aliases:
-                return alias_name
-            # Also check if it's an imported alias
-            if alias_name in self._imported_aliases:
-                return alias_name
+        qualified_name = self._build_qualified_flat_name(module_type)
+        alias_name = helper.new_builder_flat(qualified_name)
+        if alias_name in self._all_type_aliases:
+            return alias_name
+        if alias_name in self._imported_aliases:
+            return alias_name
         return None
 
     def _get_flat_reader_alias(self, module_type: str) -> str | None:
@@ -216,21 +231,15 @@ class Writer:
             module_type: The module type path (e.g., "_CalculatorModule._ExpressionModule")
 
         Returns:
-            The flat Reader alias name if the type is defined in this module (e.g., "ExpressionReader"),
+            The flat Reader alias name if the type is defined in this module (e.g., "CalculatorExpressionReader"),
             or None if the type is imported from another module
         """
-        # Extract the last component (e.g., "_ExpressionStructModule")
-        last_part = module_type.split(".")[-1]
-        # Remove "_" prefix and "Module" suffix to get the base name
-        if last_part.startswith("_"):
-            base_name = self._extract_name_from_protocol(last_part)
-            alias_name = helper.new_reader_flat(base_name)
-            # Check if this alias is defined in the current module
-            if alias_name in self._all_type_aliases:
-                return alias_name
-            # Also check if it's an imported alias
-            if alias_name in self._imported_aliases:
-                return alias_name
+        qualified_name = self._build_qualified_flat_name(module_type)
+        alias_name = helper.new_reader_flat(qualified_name)
+        if alias_name in self._all_type_aliases:
+            return alias_name
+        if alias_name in self._imported_aliases:
+            return alias_name
         return None
 
     def _get_flat_client_alias(self, module_type: str) -> str | None:
@@ -1804,9 +1813,23 @@ class Writer:
         # The type's scoped_name will be used for all internal type references
         new_type = self.register_type(schema.node.id, schema, name=protocol_class_name)
 
+        # Build qualified flat name by walking up parent scopes (same as enums)
+        # e.g., for ManagerState.ProcessState -> "ManagerStateProcessState"
+        flat_name = type_name
+        s = self.scope.parent  # parent of the newly created scope
+        while s and not s.is_root:
+            if s.name.startswith("_"):
+                part = self._extract_name_from_protocol(s.name)
+            else:
+                part = s.name
+            flat_name = f"{part}{flat_name}"
+            s = s.parent
+
         # Create context with auto-generated names
-        # Pass the original type_name for TypeAlias generation
-        context = StructGenerationContext.create_with_protocol(schema, type_name, protocol_class_name, new_type, [])
+        # Pass the qualified flat_name for TypeAlias generation, and original type_name for internal use
+        context = StructGenerationContext.create_with_protocol(
+            schema, type_name, protocol_class_name, new_type, [], qualified_flat_name=flat_name
+        )
 
         return context, protocol_declaration
 
@@ -1843,7 +1866,7 @@ class Writer:
 
     def _resolve_nested_schema(
         self,
-        nested_node: NestedNodeReader,
+        nested_node: NodeNestedNodeReader,
         parent_schema: _ParsedSchema | _StructSchema | _EnumSchema | _InterfaceSchema,
     ) -> _ParsedSchema | _StructSchema | _EnumSchema | _InterfaceSchema | None:
         """Resolve a nested schema from a nested node.

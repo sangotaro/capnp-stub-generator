@@ -33,8 +33,8 @@ def test_group_struct_naming(tmp_path):
     # Check that Struct is used with parent scoping
     # Parent is TestGroupStruct, so group name should be TestGroupStructStruct
     assert "class _TestGroupStructStructStructModule(_StructModule):" in content
-    assert "type TestGroupStructStructReader = _TestGroupStructStructStructModule.Reader" in content
-    assert "type TestGroupStructStructBuilder = _TestGroupStructStructStructModule.Builder" in content
+    assert "type TestGroupStructTestGroupStructStructReader = _TestGroupStructStructStructModule.Reader" in content
+    assert "type TestGroupStructTestGroupStructStructBuilder = _TestGroupStructStructStructModule.Builder" in content
 
     # Check that generic Struct is NOT used (to avoid collisions)
     assert "class _StructStructModule" not in content
@@ -45,8 +45,8 @@ def test_group_struct_naming(tmp_path):
     # Check that Enum is used with parent scoping
     # Parent is TestGroupEnum, so group name should be TestGroupEnumEnum
     assert "class _TestGroupEnumEnumStructModule(_StructModule):" in content
-    assert "type TestGroupEnumEnumReader = _TestGroupEnumEnumStructModule.Reader" in content
-    assert "type TestGroupEnumEnumBuilder = _TestGroupEnumEnumStructModule.Builder" in content
+    assert "type TestGroupEnumTestGroupEnumEnumReader = _TestGroupEnumEnumStructModule.Reader" in content
+    assert "type TestGroupEnumTestGroupEnumEnumBuilder = _TestGroupEnumEnumStructModule.Builder" in content
 
     # Check that generic Enum is NOT used (to avoid collisions)
     assert "class _EnumStructModule" not in content

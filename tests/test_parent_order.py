@@ -16,8 +16,8 @@ def test_nested_type_from_later_struct_is_generated(basic_stubs):
 
     # _ItemStructModule should exist inside _ProducerStructModule
     assert "_ItemStructModule" in content, "Item struct module should be generated"
-    assert "type ItemReader = _ProducerStructModule._ItemStructModule.Reader" in content
-    assert "type ItemBuilder = _ProducerStructModule._ItemStructModule.Builder" in content
+    assert "type ProducerItemReader = _ItemStructModule.Reader" in content
+    assert "type ProducerItemBuilder = _ItemStructModule.Builder" in content
 
 
 def test_consumer_references_use_flat_aliases(basic_stubs):
@@ -25,18 +25,18 @@ def test_consumer_references_use_flat_aliases(basic_stubs):
     stub_file = basic_stubs / "parent_order_capnp.pyi"
     lines = read_stub_file(stub_file)
 
-    # Consumer Reader should have: def item(self) -> ItemReader: ...
-    assert any("def item(self) -> ItemReader" in line for line in lines), (
-        "Consumer Reader should reference ItemReader"
+    # Consumer Reader should have: def item(self) -> ProducerItemReader: ...
+    assert any("def item(self) -> ProducerItemReader" in line for line in lines), (
+        "Consumer Reader should reference ProducerItemReader"
     )
 
-    # Consumer Builder should have: def item(self) -> ItemBuilder: ...
-    # and setter: def item(self, value: ItemBuilder | ItemReader | dict[str, Any]) -> None: ...
-    assert any("def item(self) -> ItemBuilder" in line for line in lines), (
-        "Consumer Builder getter should reference ItemBuilder"
+    # Consumer Builder should have: def item(self) -> ProducerItemBuilder: ...
+    # and setter: def item(self, value: ProducerItemBuilder | ProducerItemReader | dict[str, Any]) -> None: ...
+    assert any("def item(self) -> ProducerItemBuilder" in line for line in lines), (
+        "Consumer Builder getter should reference ProducerItemBuilder"
     )
-    assert any("def item(self, value: ItemBuilder | ItemReader" in line for line in lines), (
-        "Consumer Builder setter should reference ItemBuilder | ItemReader"
+    assert any("def item(self, value: ProducerItemBuilder | ProducerItemReader" in line for line in lines), (
+        "Consumer Builder setter should reference ProducerItemBuilder | ProducerItemReader"
     )
 
 
@@ -47,5 +47,5 @@ def test_no_undefined_type_references(basic_stubs):
 
     # Should NOT have bare "Item.Reader" or "Item.Builder" (variable path)
     # Should use flat aliases instead
-    assert "Item.Reader" not in content, "Should use ItemReader flat alias, not Item.Reader"
-    assert "Item.Builder" not in content, "Should use ItemBuilder flat alias, not Item.Builder"
+    assert "Item.Reader" not in content, "Should use ProducerItemReader flat alias, not Item.Reader"
+    assert "Item.Builder" not in content, "Should use ProducerItemBuilder flat alias, not Item.Builder"

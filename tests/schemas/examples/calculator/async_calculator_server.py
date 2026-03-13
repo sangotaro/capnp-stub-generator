@@ -13,7 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 
 async def evaluate_impl(
-    expression: calculator_capnp.ExpressionBuilder | calculator_capnp.ExpressionReader,
+    expression: calculator_capnp.CalculatorExpressionBuilder | calculator_capnp.CalculatorExpressionReader,
     params: calculator_capnp.Float64ListReader | None = None,
 ):
     """Implementation of CalculatorImpl::evaluate(), also shared by
@@ -60,9 +60,9 @@ class FunctionImpl(calculator_capnp.Calculator.Function.Server):
     """Implementation of the Calculator.Function Cap'n Proto interface, where the
     function is defined by a Calculator.Expression."""
 
-    def __init__(self, paramCount: int, body: calculator_capnp.ExpressionReader):
+    def __init__(self, paramCount: int, body: calculator_capnp.CalculatorExpressionReader):
         self.paramCount: int = paramCount
-        self.body: calculator_capnp.ExpressionBuilder = body.as_builder()
+        self.body: calculator_capnp.CalculatorExpressionBuilder = body.as_builder()
 
     async def call(self, params, _context, **kwargs):
         """Note that we're returning a Promise object here, and bypassing the

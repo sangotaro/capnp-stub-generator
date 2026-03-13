@@ -38,7 +38,7 @@ def test_server_methods_have_signatures(calculator_stub_lines):
 
     # Calculator.Server should have evaluate method with Reader type and return NamedTuple with "Tuple" suffix
     assert "def evaluate(" in content
-    assert "expression: ExpressionReader" in content
+    assert "expression: CalculatorExpressionReader" in content
     assert (
         "Awaitable[_CalculatorInterfaceModule._ValueInterfaceModule.Server | _CalculatorInterfaceModule.Server.EvaluateResultTuple | None]"
         in content

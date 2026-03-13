@@ -14,7 +14,7 @@ def test_both_method_variants_exist(calculator_stubs):
     content = stub_file.read_text()
 
     # Regular method with individual parameters (single line signature)
-    assert "def evaluate(self, expression: ExpressionReader, _context:" in content
+    assert "def evaluate(self, expression: CalculatorExpressionReader, _context:" in content
     assert "_context: _CalculatorInterfaceModule.Server.EvaluateCallContext" in content
     assert "**kwargs: Any" in content
 
