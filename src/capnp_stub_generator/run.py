@@ -743,14 +743,14 @@ def format_outputs(raw_input: str, is_pyi: bool) -> str:
         try:
             # Run ruff check --fix to fix import ordering and other issues
             subprocess.run(
-                ["ruff", "check", "--fix", str(temp_path)],
+                ["ruff", "check", "--isolated", "--fix", str(temp_path)],
                 capture_output=True,
                 check=False,  # Don't raise on non-zero exit
             )
 
             # Run ruff format with very large line length (320 is max) to prevent wrapping
             subprocess.run(
-                ["ruff", "format", "--line-length", "320", str(temp_path)],
+                ["ruff", "format", "--isolated", "--line-length", "320", str(temp_path)],
                 capture_output=True,
                 check=True,
             )
