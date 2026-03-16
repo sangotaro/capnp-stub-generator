@@ -1753,11 +1753,10 @@ class Writer:
         # Ensure Literal is imported for type alias generation
         self._add_typing_import("Literal")
 
-        # For nested enums, add instance annotation so enum.value works at runtime
-        is_nested = enum_parent_scope and not enum_parent_scope.is_root
-        if is_nested:
-            # Instance annotation: allows Calculator.Operator.add to return int at runtime
-            enum_parent_scope.add(f"{context.type_name}: {enum_class_name}")
+        # Add instance annotation so enum.value works at runtime
+        # For nested enums, add to parent scope; for top-level enums, add to root scope
+        target_scope = enum_parent_scope if (enum_parent_scope and not enum_parent_scope.is_root) else self.scope
+        target_scope.add(f"{context.type_name}: {enum_class_name}")
 
         # Track for top-level annotations
         # For enums, we store the enum values to generate the type alias
