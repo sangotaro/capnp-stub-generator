@@ -29,8 +29,8 @@ def test_interleaved_groups_union_and_nested_group_fields(dummy_stub_lines):
 def test_nested_types_enums_and_lists(dummy_stub_lines):
     lines = dummy_stub_lines
     # Nested enums are now simple classes under their parent struct with instance annotations
-    assert any(re.match(r"^\s*class _NestedEnum1EnumModule:", line) for line in lines)
-    assert any(re.match(r"^\s*class _NestedEnum2EnumModule:", line) for line in lines)
+    assert any(re.match(r"^\s*class _NestedEnum1EnumModule\(_EnumModule\):", line) for line in lines)
+    assert any(re.match(r"^\s*class _NestedEnum2EnumModule\(_EnumModule\):", line) for line in lines)
     assert any("NestedEnum1: _NestedEnum1EnumModule" in line for line in lines)
     assert any("NestedEnum2: _NestedEnum2EnumModule" in line for line in lines)
     # Using declarations produce aliases or reexports

@@ -16,7 +16,7 @@ def basic_low_stub_lines(basic_stubs):
 def test_enum_color_defined(basic_low_stub_lines):
     lines = basic_low_stub_lines
     # Enums are now generated as simple classes with int attributes
-    assert any("class _ColorEnumModule:" in line for line in lines)
+    assert any("class _ColorEnumModule(_EnumModule):" in line for line in lines)
     # Enum values are int annotations
     assert any("red: int" in line for line in lines)
     assert any("green: int" in line for line in lines)

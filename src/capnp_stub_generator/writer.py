@@ -104,7 +104,7 @@ class Writer:
         self._imports: list[str] = []
         self._add_import("from __future__ import annotations")
         self._add_import(
-            "from capnp.lib.capnp import _DynamicCapabilityClient, _DynamicCapabilityServer, _DynamicEnum, _DynamicStructBuilder, _DynamicStructReader, _DynamicListBuilder, _DynamicListReader, _DynamicObjectBuilder, _DynamicObjectReader, _InterfaceModule, _Request, _StructModule"
+            "from capnp.lib.capnp import _DynamicCapabilityClient, _DynamicCapabilityServer, _DynamicEnum, _DynamicStructBuilder, _DynamicStructReader, _DynamicListBuilder, _DynamicListReader, _DynamicObjectBuilder, _DynamicObjectReader, _EnumModule, _InterfaceModule, _Request, _StructModule"
         )
 
         self._typing_imports: set[Writer.VALID_TYPING_IMPORTS] = set()
@@ -1703,8 +1703,8 @@ class Writer:
         # No special imports needed - just a plain class
         self._add_enum_import()
 
-        # Generate a plain class declaration (no inheritance)
-        enum_declaration = helper.new_class_declaration(enum_class_name, [])
+        # Generate class declaration inheriting from _EnumModule
+        enum_declaration = helper.new_class_declaration(enum_class_name, ["_EnumModule"])
 
         # Find the parent scope for the enum (where it should be declared)
         try:

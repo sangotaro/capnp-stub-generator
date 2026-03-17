@@ -6,7 +6,7 @@ from __future__ import annotations
 def test_enum_definition_and_imports(dummy_stub_lines):
     lines = dummy_stub_lines
     # Enums are now simple classes with int attributes
-    assert any(line.strip().startswith("class _TestEnumEnumModule:") for line in lines)
+    assert any(line.strip().startswith("class _TestEnumEnumModule(_EnumModule):") for line in lines)
     # Type alias at top level (not instance annotation)
     assert any(line.strip().startswith("type TestEnumEnum = int | Literal[") for line in lines)
     # Enum values are now int annotations (e.g., "foo: int")

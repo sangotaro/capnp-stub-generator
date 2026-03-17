@@ -44,7 +44,7 @@ def test_nested_enum_and_literal_and_overload():
     stub_path = _get_stub_path("nested.capnp")
     lines = _read(stub_path)
     # Enum should now be a simple class with int annotations
-    assert any(re.match(r"^\s*class _KindEnumModule:", line) for line in lines)
+    assert any(re.match(r"^\s*class _KindEnumModule\(_EnumModule\):", line) for line in lines)
     assert any("Kind: _KindEnumModule" in line for line in lines)
     # Sequence import still expected for list fields (only for nested lists or setters)
     # assert any(line.startswith("from collections.abc import") and "Sequence" in line for line in lines)
