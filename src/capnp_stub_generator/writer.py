@@ -895,6 +895,8 @@ class Writer:
         # Add as instance method with @override decorator
         self.scope.add("@override")
         self.scope.add(helper.new_function("new_message", new_message_params, builder_type_name))
+        # Add __call__ with same signature (pycapnp allows StructModule() as shorthand for new_message())
+        self.scope.add(helper.new_function("__call__", new_message_params, builder_type_name))
 
     def _gen_struct_base_class(
         self,
