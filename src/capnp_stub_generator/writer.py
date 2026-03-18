@@ -137,6 +137,8 @@ class Writer:
 
         # Track generated list types to avoid duplicates
         self._generated_list_types: set[str] = set()
+        # Map list class name -> element setter type (for list field setters)
+        self._list_element_setter_types: dict[str, str] = {}
 
         self.docstring: str = f'"""This is an automatically generated stub for `{self._module_path.name}`."""'
 
@@ -598,6 +600,13 @@ class Writer:
                 # Setter accepts Builder/Reader types + dict, but NOT the base type
                 setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
                 setter_type = field.get_type_with_affixes(setter_types) + " | Sequence[dict[str, Any]]"
+                self._add_typing_import("Sequence")
+                self._add_typing_import("Any")
+            elif field.list_element_setter_type:
+                # List fields with wrapper classes: setter accepts ListBuilder/ListReader + Sequence of elements
+                getter_type = field.get_type_with_affixes([helper.BUILDER_NAME])
+                setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
+                setter_type = field.get_type_with_affixes(setter_types) + f" | Sequence[{field.list_element_setter_type}]"
                 self._add_typing_import("Sequence")
                 self._add_typing_import("Any")
             else:
@@ -1286,6 +1295,7 @@ class Writer:
             return list_class_name, reader_alias, builder_alias
 
         self._generated_list_types.add(list_class_name)
+        self._list_element_setter_types[list_class_name] = setter_type
 
         # Register in self._all_type_aliases
         self._all_type_aliases[reader_alias] = (f"{list_class_name}.Reader", "Reader")
@@ -1445,7 +1455,7 @@ class Writer:
             helper.TypeHintedVariable: The extracted hinted variable object.
         """
         # Generate the specific list class
-        _, reader_alias, builder_alias = self._generate_list_class(field.slot.type)
+        list_class_name, reader_alias, builder_alias = self._generate_list_class(field.slot.type)
 
         # Create TypeHintedVariable
         # Primary type is Reader (for read-only access)
@@ -1460,6 +1470,9 @@ class Writer:
 
         # Add Reader variant explicitly
         hinted_variable.add_type_hint(helper.TypeHint(reader_alias, affix="Reader", flat_alias=True))
+
+        # Store element setter type for list field setters
+        hinted_variable.list_element_setter_type = self._list_element_setter_types[list_class_name]
 
         return hinted_variable
 
