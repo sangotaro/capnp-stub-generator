@@ -1896,6 +1896,7 @@ __all__ = [
     # Internal classes that are exposed but prefixed with underscore
     "_CapabilityClient",
     "_DynamicCapabilityClient",
+    "_DynamicEnum",
     "_DynamicListBuilder",
     "_DynamicListReader",
     "_DynamicOrphan",
@@ -1903,6 +1904,7 @@ __all__ = [
     "_DynamicStructBuilder",
     "_DynamicStructReader",
     "_EventLoop",
+    "_EnumModule",
     "_EnumSchema",
     "_InterfaceSchema",
     "_InterfaceMethod",
