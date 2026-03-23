@@ -21,7 +21,7 @@ class TestRequestBuilderStructure:
         stub_content = stub_file.read_text()
 
         # Should have EvaluateRequest class
-        assert "class EvaluateRequest(Protocol):" in stub_content
+        assert "class EvaluateRequest(typing.Protocol):" in stub_content
 
         # Should have expression field with Expression type (allows dict for init)
         lines = stub_content.split("\n")
@@ -29,7 +29,7 @@ class TestRequestBuilderStructure:
         found_expression_field = False
 
         for line in lines:
-            if "class EvaluateRequest(Protocol):" in line:
+            if "class EvaluateRequest(typing.Protocol):" in line:
                 in_evaluate_request = True
             elif in_evaluate_request and "expression:" in line:
                 assert "ExpressionBuilder" in line, f"Expected Expression type, got: {line}"
@@ -46,7 +46,7 @@ class TestRequestBuilderStructure:
         stub_content = stub_file.read_text()
 
         # Should have DeffunctionRequest class
-        assert "class DeffunctionRequest(Protocol):" in stub_content
+        assert "class DeffunctionRequest(typing.Protocol):" in stub_content
 
         # Should have both fields
         lines = stub_content.split("\n")
@@ -55,7 +55,7 @@ class TestRequestBuilderStructure:
         found_body = False
 
         for line in lines:
-            if "class DeffunctionRequest(Protocol):" in line:
+            if "class DeffunctionRequest(typing.Protocol):" in line:
                 in_deffunction_request = True
             elif in_deffunction_request and "paramCount:" in line:
                 assert "int" in line
@@ -76,10 +76,10 @@ class TestRequestBuilderStructure:
         stub_content = stub_file.read_text()
 
         # Should have CallRequest class
-        assert "class CallRequest(Protocol):" in stub_content
+        assert "class CallRequest(typing.Protocol):" in stub_content
 
         # Should have params field
-        assert "params: Float64ListBuilder | Float64ListReader | Sequence[Any]" in stub_content
+        assert "params: Float64ListBuilder | Float64ListReader | Sequence[typing.Any]" in stub_content
 
 
 class TestRequestBuilderSendMethod:
@@ -96,7 +96,7 @@ class TestRequestBuilderSendMethod:
         found_send = False
 
         for line in lines:
-            if "class EvaluateRequest(Protocol):" in line:
+            if "class EvaluateRequest(typing.Protocol):" in line:
                 in_evaluate_request = True
             elif in_evaluate_request and "def send(self)" in line:
                 # Should return fully qualified result type
@@ -119,7 +119,7 @@ class TestRequestBuilderSendMethod:
         found_send = False
 
         for line in lines:
-            if "class DeffunctionRequest(Protocol):" in line:
+            if "class DeffunctionRequest(typing.Protocol):" in line:
                 in_request = True
             elif in_request and "def send(self)" in line:
                 assert "DeffunctionResult:" in line
@@ -141,7 +141,7 @@ class TestRequestBuilderSendMethod:
         found_send = False
 
         for line in lines:
-            if "class ReadRequest(Protocol):" in line:
+            if "class ReadRequest(typing.Protocol):" in line:
                 in_request = True
             elif in_request and "def send(self)" in line:
                 assert "ReadResult:" in line
@@ -163,7 +163,7 @@ class TestRequestBuilderSendMethod:
         found_send = False
 
         for line in lines:
-            if "class CallRequest(Protocol):" in line:
+            if "class CallRequest(typing.Protocol):" in line:
                 in_request = True
             elif in_request and "def send(self)" in line:
                 assert "CallResult:" in line

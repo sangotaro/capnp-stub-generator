@@ -16,7 +16,7 @@ def test_both_method_variants_exist(calculator_stubs):
     # Regular method with individual parameters (single line signature)
     assert "def evaluate(self, expression: CalculatorExpressionReader, _context:" in content
     assert "_context: _CalculatorInterfaceModule.Server.EvaluateCallContext" in content
-    assert "**kwargs: Any" in content
+    assert "**kwargs: typing.Any" in content
 
     # _context variant with only context parameter
     assert "def evaluate_context(self, context: _CalculatorInterfaceModule.Server.EvaluateCallContext)" in content
@@ -53,7 +53,7 @@ def test_callcontext_has_params_and_results(calculator_stubs):
     content = stub_file.read_text()
 
     # Check a method with parameters and results
-    assert "class EvaluateCallContext(Protocol):" in content
+    assert "class EvaluateCallContext(typing.Protocol):" in content
     assert "params: _CalculatorInterfaceModule.Server.EvaluateParams" in content
     # Results now point to Server.Result
     assert "@property" in content
@@ -66,7 +66,7 @@ def test_callcontext_void_method(basic_stubs):
     content = stub_file.read_text()
 
     # Check void method CallContext (Reader.close is a void method)
-    assert "class CloseCallContext(Protocol):" in content
+    assert "class CloseCallContext(typing.Protocol):" in content
     assert "params: _ChannelInterfaceModule._ReaderInterfaceModule.Server.CloseParams" in content
 
     # Should NOT have results for void method
@@ -74,7 +74,7 @@ def test_callcontext_void_method(basic_stubs):
 
     # Find CloseCallContext inside Reader
     close_context = re.search(
-        r"class CloseCallContext\(Protocol\):.*?(?=\n\n|\n            class |\n            def )", content, re.DOTALL
+        r"class CloseCallContext\(typing\.Protocol\):.*?(?=\n\n|\n            class |\n            def )", content, re.DOTALL
     )
     assert close_context
     # Verify no results field
@@ -114,7 +114,7 @@ def test_context_method_documentation(calculator_stubs):
     )
 
     # The CallContext should provide access to both params and results
-    assert "class DeffunctionCallContext(Protocol):" in content
+    assert "class DeffunctionCallContext(typing.Protocol):" in content
     assert "params: _CalculatorInterfaceModule.Server.DeffunctionParams" in content
     # Results now point to Server.Result
     assert "@property" in content
@@ -130,7 +130,7 @@ def test_context_methods_count(calculator_stubs):
 
     # Find all Server class methods
     server_sections = re.findall(
-        r"class Server\(Protocol\):.*?(?=\n    class [A-Z]|\nclass [A-Z]|\Z)", content, re.DOTALL
+        r"class Server\(typing\.Protocol\):.*?(?=\n    class [A-Z]|\nclass [A-Z]|\Z)", content, re.DOTALL
     )
 
     for server_section in server_sections:

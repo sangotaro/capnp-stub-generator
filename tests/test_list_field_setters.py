@@ -13,7 +13,7 @@ def test_struct_list_setter_accepts_sequence(basic_stubs):
     # nestedList: List(Nested) setter should accept Sequence of element types
     assert (
         "def nestedList(self, value: NestedListBuilder | NestedListReader "
-        "| Sequence[MidFeatureContainerNestedReader | MidFeatureContainerNestedBuilder | dict[str, Any]]"
+        "| Sequence[MidFeatureContainerNestedReader | MidFeatureContainerNestedBuilder | dict[str, typing.Any]]"
     ) in content
 
 
@@ -42,7 +42,7 @@ def test_primitive_list_setter_accepts_sequence(basic_stubs):
 
 
 def test_list_setter_no_bare_dict(basic_stubs):
-    """List field setters should NOT have bare dict[str, Any] (only inside Sequence)."""
+    """List field setters should NOT have bare dict[str, typing.Any] (only inside Sequence)."""
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     content = stub_file.read_text()
 
@@ -51,9 +51,9 @@ def test_list_setter_no_bare_dict(basic_stubs):
         if ".setter" in line:
             continue
         if "ListBuilder |" in line and "ListReader |" in line and "def " in line:
-            # This is a list field setter - should not end with "| dict[str, Any])"
-            assert "ListReader | dict[str, Any])" not in line, (
-                f"List field setter should not have bare dict[str, Any]: {line.strip()}"
+            # This is a list field setter - should not end with "| dict[str, typing.Any])"
+            assert "ListReader | dict[str, typing.Any])" not in line, (
+                f"List field setter should not have bare dict[str, typing.Any]: {line.strip()}"
             )
 
 

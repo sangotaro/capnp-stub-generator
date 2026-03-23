@@ -10,7 +10,7 @@ def test_top_level_union_which_literal(basic_stubs):
     with open(path, encoding="utf8") as f:
         lines = f.readlines()
     # Expect which() function for discriminant unions.
-    assert any(re.match(r"^\s*def which\(self\) -> Literal\[", line) for line in lines)
+    assert any(re.match(r"^\s*def which\(self\) -> typing\.Literal\[", line) for line in lines)
 
 
 def test_union_field_names_present(basic_stubs):

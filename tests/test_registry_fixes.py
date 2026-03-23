@@ -16,7 +16,7 @@ def test_server_named_tuple_interface_type(zalfmas_stubs):
     server_content = server_match.group(1)
 
     # Find RegistryResultTuple
-    tuple_match = re.search(r"class RegistryResultTuple\(NamedTuple\):(.*?)(?=\n\s+class)", server_content, re.DOTALL)
+    tuple_match = re.search(r"class RegistryResultTuple\(typing\.NamedTuple\):(.*?)(?=\n\s+class)", server_content, re.DOTALL)
     assert tuple_match, "RegistryResultTuple class not found in Server"
     tuple_content = tuple_match.group(1)
 
@@ -42,7 +42,7 @@ def test_list_of_structs_not_any(zalfmas_stubs):
 
     # Find SupportedcategoriesResult
     result_match = re.search(
-        r"class SupportedcategoriesResult\(Awaitable\[SupportedcategoriesResult\], Protocol\):(.*?)(?=\n\s+class|\Z)",
+        r"class SupportedcategoriesResult\(Awaitable\[SupportedcategoriesResult\], typing\.Protocol\):(.*?)(?=\n\s+class|\Z)",
         client_content,
         re.DOTALL,
     )
@@ -52,7 +52,7 @@ def test_list_of_structs_not_any(zalfmas_stubs):
     # Check cats field
     # Should be IdInformationListReader (or similar alias)
     # Currently it is Any
-    assert "cats: Any" not in result_content, "cats field should not be Any"
+    assert "cats: typing.Any" not in result_content, "cats field should not be Any"
     assert "cats: IdInformationListReader" in result_content, "cats field should be IdInformationListReader"
 
 
@@ -75,7 +75,7 @@ def test_list_of_interfaces_types(zalfmas_stubs):
     # Find RemovecategoryResult
     # Just search for the line defining the class and capture subsequent lines
     result_match = re.search(
-        r"class RemovecategoryResult\(Awaitable\[RemovecategoryResult\], Protocol\):(.*?)(?=\n\s+class|\n\s+def|\Z)",
+        r"class RemovecategoryResult\(Awaitable\[RemovecategoryResult\], typing\.Protocol\):(.*?)(?=\n\s+class|\n\s+def|\Z)",
         client_content,
         re.DOTALL,
     )

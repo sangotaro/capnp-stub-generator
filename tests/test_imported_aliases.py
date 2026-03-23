@@ -25,8 +25,8 @@ def test_imported_type_aliases_used(zalfmas_stubs):
     # Should use IdInformationReader or IdInformationBuilder (or dict)
     # Currently it might be using _IdInformationStructModule.Reader/Builder
 
-    # We expect: category: IdInformationReader | dict[str, Any] | None = None
-    # Or: category: IdInformationBuilder | dict[str, Any] | None = None
+    # We expect: category: IdInformationReader | dict[str, typing.Any] | None = None
+    # Or: category: IdInformationBuilder | dict[str, typing.Any] | None = None
 
     # Let's check what we have
     method_match = re.search(r"def addCategory\(self, category: (.*?),", client_content)
@@ -83,7 +83,7 @@ def test_imported_return_type_aliases(zalfmas_stubs):
 
     # Find RemovecategoryResult in AdminClient
     result_match = re.search(
-        r"class RemovecategoryResult\(Awaitable\[RemovecategoryResult\], Protocol\):(.*?)(?=\n\s+class|\n\s+def|\Z)",
+        r"class RemovecategoryResult\(Awaitable\[RemovecategoryResult\], typing\.Protocol\):(.*?)(?=\n\s+class|\n\s+def|\Z)",
         client_content,
         re.DOTALL,
     )

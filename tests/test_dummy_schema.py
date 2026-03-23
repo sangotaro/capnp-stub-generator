@@ -21,7 +21,7 @@ class TestDummyEnumsAndTypes:
         # Enums are now simple classes with int attributes
         assert any(line.strip().startswith("class _TestEnumEnumModule(_EnumModule):") for line in lines)
         # Type alias at top level (not instance annotation)
-        assert any(line.strip().startswith("type TestEnumEnum = int | Literal[") for line in lines)
+        assert any(line.strip().startswith("type TestEnumEnum = int | typing.Literal[") for line in lines)
         for name in ["foo", "bar", "baz", "qux"]:
             assert any(f"{name}: int" in line for line in lines)
 
@@ -138,8 +138,8 @@ class TestDummyUnions:
 
     def test_union_which_methods_and_literal_import(self, dummy_stub_lines):
         lines = dummy_stub_lines
-        assert any(re.match(r"^\s*def which\(self\) -> Literal\[", line) for line in lines)
-        assert any(line.startswith("from typing import") and "Literal" in line for line in lines)
+        assert any(re.match(r"^\s*def which\(self\) -> typing\.Literal\[", line) for line in lines)
+        assert any("import typing" in line for line in lines)
 
     def test_unnamed_union_fields_present(self, dummy_stub_lines):
         lines = dummy_stub_lines

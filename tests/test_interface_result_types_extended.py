@@ -29,7 +29,7 @@ def test_registry_result_type(zalfmas_stubs):
 
     # Let's just search for the class definition and capture a few lines
     result_match = re.search(
-        r"class RegistryResult\(Awaitable\[RegistryResult\], Protocol\):(.*?)(?=\n\s+def|\n\s+class|\Z)",
+        r"class RegistryResult\(Awaitable\[RegistryResult\], typing\.Protocol\):(.*?)(?=\n\s+def|\n\s+class|\Z)",
         client_content,
         re.DOTALL,
     )

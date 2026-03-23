@@ -45,7 +45,7 @@ class TestRPCResultTypes:
         # defFunction should return _CalculatorInterfaceModule.CalculatorClient.DeffunctionResult (which is Awaitable)
         assert "def defFunction(" in stub_content
         assert "paramCount: int | None = None" in stub_content
-        assert "body: CalculatorExpressionBuilder | CalculatorExpressionReader | dict[str, Any] | None = None" in stub_content
+        assert "body: CalculatorExpressionBuilder | CalculatorExpressionReader | dict[str, typing.Any] | None = None" in stub_content
         assert "-> _CalculatorInterfaceModule.CalculatorClient.DeffunctionResult:" in stub_content
 
     def test_getoperator_returns_result_with_func_field(self, generate_calculator_stubs):
@@ -93,7 +93,7 @@ class TestRPCResultTypes:
 
         # call should return _CalculatorInterfaceModule._FunctionInterfaceModule.CallResult (which is Awaitable)
         assert (
-            "def call(self, params: Float64ListBuilder | Float64ListReader | Sequence[Any] | None = None) -> _CalculatorInterfaceModule._FunctionInterfaceModule.FunctionClient.CallResult:"
+            "def call(self, params: Float64ListBuilder | Float64ListReader | Sequence[typing.Any] | None = None) -> _CalculatorInterfaceModule._FunctionInterfaceModule.FunctionClient.CallResult:"
             in stub_content
         )
 
@@ -108,11 +108,11 @@ class TestRPCResultsAreAwaitable:
 
         # All result types should inherit from Awaitable[Result] for promise pipelining
         # Now nested in Client and Server classes
-        assert "class EvaluateResult(Awaitable[EvaluateResult], Protocol):" in stub_content
-        assert "class DeffunctionResult(Awaitable[DeffunctionResult], Protocol):" in stub_content
-        assert "class GetoperatorResult(Awaitable[GetoperatorResult], Protocol):" in stub_content
-        assert "class ReadResult(Awaitable[ReadResult], Protocol):" in stub_content
-        assert "class CallResult(Awaitable[CallResult], Protocol):" in stub_content
+        assert "class EvaluateResult(Awaitable[EvaluateResult], typing.Protocol):" in stub_content
+        assert "class DeffunctionResult(Awaitable[DeffunctionResult], typing.Protocol):" in stub_content
+        assert "class GetoperatorResult(Awaitable[GetoperatorResult], typing.Protocol):" in stub_content
+        assert "class ReadResult(Awaitable[ReadResult], typing.Protocol):" in stub_content
+        assert "class CallResult(Awaitable[CallResult], typing.Protocol):" in stub_content
 
         # Methods should return Client.Result (nested in Client class)
         assert "-> _CalculatorInterfaceModule.CalculatorClient.EvaluateResult:" in stub_content
@@ -123,8 +123,8 @@ class TestRPCResultsAreAwaitable:
         stub_file = generate_calculator_stubs / "calculator_capnp.pyi"
         stub_content = stub_file.read_text()
 
-        # Should import Awaitable
-        assert "from typing import" in stub_content
+        # Should import Awaitable from collections.abc
+        assert "from collections.abc import" in stub_content
         assert "Awaitable" in stub_content
 
 
@@ -136,7 +136,7 @@ class TestEnumParametersAcceptLiterals:
         stub_file = generate_calculator_stubs / "calculator_capnp.pyi"
         stub_content = stub_file.read_text()
 
-        # getOperator should accept int | Literal[...] | None (optional) -> now uses CalculatorOperatorEnum alias
+        # getOperator should accept int | typing.Literal[...] | None (optional) -> now uses CalculatorOperatorEnum alias
         assert "def getOperator(" in stub_content
         assert "op: CalculatorOperatorEnum | None = None" in stub_content
 
@@ -154,7 +154,7 @@ class TestEnumParametersAcceptLiterals:
         stub_content = stub_file.read_text()
 
         # Should import Literal
-        assert "from typing import" in stub_content
+        assert "import typing" in stub_content
         assert "Literal" in stub_content
 
 

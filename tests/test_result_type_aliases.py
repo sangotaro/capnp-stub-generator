@@ -128,7 +128,7 @@ def test_result_type_alias_usage_in_type_hints(calculator_stubs):
     assert "type EvaluateResult = _CalculatorInterfaceModule.CalculatorClient.EvaluateResult" in content
 
     # And the actual Result class should be nested in Client
-    assert "class EvaluateResult(Awaitable[EvaluateResult], Protocol):" in content
+    assert "class EvaluateResult(Awaitable[EvaluateResult], typing.Protocol):" in content
     assert "    class CalculatorClient" in content
 
 

@@ -23,7 +23,7 @@ class TestCalculatorInterfaceMethodTypes:
 
         # Should have evaluate with Expression parameter (optional) and EvaluateResult return type
         assert "def evaluate(" in stub_content
-        assert "expression: CalculatorExpressionBuilder | CalculatorExpressionReader | dict[str, Any] | None = None" in stub_content
+        assert "expression: CalculatorExpressionBuilder | CalculatorExpressionReader | dict[str, typing.Any] | None = None" in stub_content
         assert ") -> _CalculatorInterfaceModule.CalculatorClient.EvaluateResult:" in stub_content
 
         # Should NOT have Any for the expression parameter
@@ -37,7 +37,7 @@ class TestCalculatorInterfaceMethodTypes:
         # Should have defFunction with int and Expression parameters (both optional) and DeffunctionResult return
         assert "def defFunction(" in stub_content
         assert "paramCount: int | None = None" in stub_content
-        assert "body: CalculatorExpressionBuilder | CalculatorExpressionReader | dict[str, Any] | None = None" in stub_content
+        assert "body: CalculatorExpressionBuilder | CalculatorExpressionReader | dict[str, typing.Any] | None = None" in stub_content
         assert "DeffunctionResult:" in stub_content
 
         # Should NOT have Any for the body parameter
@@ -48,10 +48,10 @@ class TestCalculatorInterfaceMethodTypes:
         stub_file = generate_calculator_stubs / "calculator_capnp.pyi"
         stub_content = stub_file.read_text()
 
-        # Should have getOperator with enum parameter as int | Literal[...]
+        # Should have getOperator with enum parameter as int | typing.Literal[...]
         assert "def getOperator(" in stub_content
         # Check that the method accepts the enum literals
-        assert 'int | Literal["add", "subtract", "multiply", "divide"]' in stub_content
+        assert 'int | typing.Literal["add", "subtract", "multiply", "divide"]' in stub_content
         assert "GetoperatorResult" in stub_content
 
         # Should NOT have Any for the op parameter
@@ -64,7 +64,7 @@ class TestCalculatorInterfaceMethodTypes:
 
         # Should have call with Sequence[float] parameter (optional) and CallResult return type
         assert "def call(" in stub_content
-        assert "params: Float64ListBuilder | Float64ListReader | Sequence[Any] | None = None" in stub_content
+        assert "params: Float64ListBuilder | Float64ListReader | Sequence[typing.Any] | None = None" in stub_content
         assert ") -> _CalculatorInterfaceModule._FunctionInterfaceModule.FunctionClient.CallResult:" in stub_content
 
         # Should NOT have Any for the params parameter
@@ -136,7 +136,7 @@ class TestInterfaceMethodTypeRegression:
         calculator_methods = []
 
         for line in lines:
-            if "class Calculator(Protocol):" in line:
+            if "class Calculator(typing.Protocol):" in line:
                 in_calculator = True
             elif in_calculator and line.startswith("class ") and "Calculator" not in line:
                 break  # End of Calculator interface
@@ -148,11 +148,11 @@ class TestInterfaceMethodTypeRegression:
             if "_request" not in method:
                 # Main methods shouldn't have Any parameters for known types
                 if "evaluate" in method:
-                    assert "expression: Any" not in method, f"evaluate should not use Any: {method}"
+                    assert "expression: typing.Any" not in method, f"evaluate should not use Any: {method}"
                 elif "defFunction" in method:
-                    assert "body: Any" not in method, f"defFunction should not use Any: {method}"
+                    assert "body: typing.Any" not in method, f"defFunction should not use Any: {method}"
                 elif "getOperator" in method:
-                    assert "op: Any" not in method, f"getOperator should not use Any: {method}"
+                    assert "op: typing.Any" not in method, f"getOperator should not use Any: {method}"
 
     def test_nested_interface_methods_typed(self, generate_calculator_stubs):
         """Test that nested interface methods (Value, Function) are properly typed."""
@@ -215,7 +215,7 @@ class TestInterfaceMethodComplexTypes:
         # Nested: instance annotation for Calculator.Operator.add access
         assert "    Operator: _OperatorEnumModule" in stub_content  # Note the indentation
         # Top-level: type alias for annotations
-        assert 'type CalculatorOperatorEnum = int | Literal["add", "subtract", "multiply", "divide"]' in stub_content
+        assert 'type CalculatorOperatorEnum = int | typing.Literal["add", "subtract", "multiply", "divide"]' in stub_content
 
     def test_list_parameter_types(self, generate_calculator_stubs):
         """Test that list parameters use Sequence with proper element types."""
@@ -223,7 +223,7 @@ class TestInterfaceMethodComplexTypes:
         stub_content = stub_file.read_text()
 
         # Function.call takes List(Float64), should be Sequence[float]
-        assert "params: Float64ListBuilder | Float64ListReader | Sequence[Any]" in stub_content
+        assert "params: Float64ListBuilder | Float64ListReader | Sequence[typing.Any]" in stub_content
 
         # Should import Sequence
         assert "from collections.abc import" in stub_content

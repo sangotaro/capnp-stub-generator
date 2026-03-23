@@ -21,7 +21,7 @@ class TestNestedResultStructure:
 
         # Client Results should be nested inside Client classes
         assert "class CalculatorClient(_DynamicCapabilityClient):" in content
-        assert "class EvaluateResult(Awaitable[EvaluateResult], Protocol):" in content
+        assert "class EvaluateResult(Awaitable[EvaluateResult], typing.Protocol):" in content
 
         # Check that Result is inside CalculatorClient
         lines = content.split("\n")
@@ -31,7 +31,7 @@ class TestNestedResultStructure:
         for i, line in enumerate(lines):
             if "class CalculatorClient(_DynamicCapabilityClient):" in line:
                 in_calculator_client = True
-            elif in_calculator_client and "class EvaluateResult(Awaitable[EvaluateResult], Protocol):" in line:
+            elif in_calculator_client and "class EvaluateResult(Awaitable[EvaluateResult], typing.Protocol):" in line:
                 found_nested_result = True
                 break
             elif in_calculator_client and line.startswith("class ") and "Client" not in line:
@@ -83,7 +83,7 @@ class TestNestedResultStructure:
         content = stub_file.read_text()
 
         # Request.send() should return Client.Result
-        assert "class EvaluateRequest(Protocol):" in content
+        assert "class EvaluateRequest(typing.Protocol):" in content
         assert "def send(self) -> _CalculatorInterfaceModule.CalculatorClient.EvaluateResult:" in content
 
     def test_callcontext_results_points_to_server_result(self, calculator_stubs):
@@ -92,12 +92,12 @@ class TestNestedResultStructure:
         content = stub_file.read_text()
 
         # CallContext.results should point to Server.Result
-        assert "class EvaluateCallContext(Protocol):" in content
+        assert "class EvaluateCallContext(typing.Protocol):" in content
         assert "@property" in content
         assert "def results(self) -> _CalculatorInterfaceModule.Server.EvaluateResult: ..." in content
 
     def test_result_tuple_stays_under_server(self, calculator_stubs):
-        """Test that ResultTuple (NamedTuple) stays under Server."""
+        """Test that ResultTuple (typing.NamedTuple) stays under Server."""
         stub_file = calculator_stubs / "calculator_capnp.pyi"
         content = stub_file.read_text()
 
@@ -109,7 +109,7 @@ class TestNestedResultStructure:
         for line in lines:
             if "class Server(_DynamicCapabilityServer):" in line:
                 in_server = True
-            elif in_server and "class EvaluateResultTuple(NamedTuple):" in line:
+            elif in_server and "class EvaluateResultTuple(typing.NamedTuple):" in line:
                 found_result_tuple = True
                 break
 
@@ -142,7 +142,7 @@ class TestNestedResultsAtDeeperLevels:
         content = stub_file.read_text()
 
         # ReadRequest.send() should return ValueClient.ReadResult
-        assert "class ReadRequest(Protocol):" in content
+        assert "class ReadRequest(typing.Protocol):" in content
         assert "def send(self) -> _CalculatorInterfaceModule._ValueInterfaceModule.ValueClient.ReadResult:" in content
 
     def test_nested_interface_callcontext(self, calculator_stubs):
@@ -151,7 +151,7 @@ class TestNestedResultsAtDeeperLevels:
         content = stub_file.read_text()
 
         # ReadCallContext.results should point to Server.ReadResult
-        assert "class ReadCallContext(Protocol):" in content
+        assert "class ReadCallContext(typing.Protocol):" in content
         assert "@property" in content
         assert "def results(self) -> _CalculatorInterfaceModule._ValueInterfaceModule.Server.ReadResult: ..." in content
 
@@ -173,7 +173,7 @@ class TestAnyPointerTypeDifferences:
         for line in lines:
             if "class HolderClient(_DynamicCapabilityClient):" in line:
                 in_holder_client = True
-            elif in_holder_client and "class ValueResult(Awaitable[ValueResult], Protocol):" in line:
+            elif in_holder_client and "class ValueResult(Awaitable[ValueResult], typing.Protocol):" in line:
                 in_value_result = True
             elif in_value_result and "value: _DynamicObjectReader" in line:
                 found_dynamic_object_reader = True
@@ -189,7 +189,7 @@ class TestAnyPointerTypeDifferences:
         # Server.ValueResult should use broad union
         # Check that the pattern exists in Server context
         assert "class Server(_DynamicCapabilityServer):" in content
-        assert "class ValueResult(Awaitable[ValueResult], Protocol):" in content
+        assert "class ValueResult(Awaitable[ValueResult], typing.Protocol):" in content
         assert "_DynamicCapabilityServer" in content
         # The broad union should exist somewhere in Server
         assert (
@@ -203,13 +203,13 @@ class TestAnyPointerTypeDifferences:
         content = stub_file.read_text()
 
         # ValueResultTuple should also use AnyPointer type alias
-        assert "class ValueResultTuple(NamedTuple):" in content
+        assert "class ValueResultTuple(typing.NamedTuple):" in content
         lines = content.split("\n")
         in_tuple = False
         found_anypointer = False
 
         for line in lines:
-            if "class ValueResultTuple(NamedTuple):" in line:
+            if "class ValueResultTuple(typing.NamedTuple):" in line:
                 in_tuple = True
             elif in_tuple and "AnyPointer" in line:
                 found_anypointer = True

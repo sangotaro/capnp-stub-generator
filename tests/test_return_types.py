@@ -67,7 +67,7 @@ class TestStructReturnTypes:
 
         # Builder setter should accept Builder/Reader + dict (may be formatted across multiple lines)
         assert "@structField.setter" in content
-        assert "value: TestAllTypesBuilder | TestAllTypesReader | dict[str, Any]" in content, (
+        assert "value: TestAllTypesBuilder | TestAllTypesReader | dict[str, typing.Any]" in content, (
             "Builder setter should accept union of Builder, Reader, and dict types (not base)"
         )
 

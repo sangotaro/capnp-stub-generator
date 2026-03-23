@@ -17,7 +17,7 @@ def test_client_result_uses_reader_only(basic_stubs):
 
     # Find InfoResult in Client
     result_match = re.search(
-        r"class InfoResult\(Awaitable\[InfoResult\], Protocol\):(.*?)(?=\n\s+def|\Z)", client_content, re.DOTALL
+        r"class InfoResult\(Awaitable\[InfoResult\], typing\.Protocol\):(.*?)(?=\n\s+def|\Z)", client_content, re.DOTALL
     )
     assert result_match, "InfoResult class not found in IdentifiableClient"
     result_content = result_match.group(1)
@@ -41,7 +41,7 @@ def test_server_result_uses_builder_and_reader(basic_stubs):
 
     # Find InfoResult in Server
     result_match = re.search(
-        r"class InfoResult\(Awaitable\[InfoResult\], Protocol\):(.*?)(?=\n\s+class)", server_content, re.DOTALL
+        r"class InfoResult\(Awaitable\[InfoResult\], typing\.Protocol\):(.*?)(?=\n\s+class)", server_content, re.DOTALL
     )
     assert result_match, "InfoResult class not found in Server"
     result_content = result_match.group(1)
@@ -69,7 +69,7 @@ def test_server_named_tuple_has_nested_field(basic_stubs):
     server_content = server_match.group(1)
 
     # Find InfoResultTuple
-    tuple_match = re.search(r"class InfoResultTuple\(NamedTuple\):(.*?)(?=\n\s+class)", server_content, re.DOTALL)
+    tuple_match = re.search(r"class InfoResultTuple\(typing\.NamedTuple\):(.*?)(?=\n\s+class)", server_content, re.DOTALL)
     assert tuple_match, "InfoResultTuple class not found in Server"
     tuple_content = tuple_match.group(1)
 

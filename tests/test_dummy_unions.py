@@ -8,9 +8,9 @@ import re
 def test_union_which_methods_and_literal_import(dummy_stub_lines):
     lines = dummy_stub_lines
     # which() for TestUnion should be present with Literal return
-    assert any(re.match(r"^\s*def which\(self\) -> Literal\[", line) for line in lines)
-    # Literal import appears (for which and maybe discriminants)
-    assert any(line.startswith("from typing import") and "Literal" in line for line in lines)
+    assert any(re.match(r"^\s*def which\(self\) -> typing\.Literal\[", line) for line in lines)
+    # typing module imported (for Literal, etc.)
+    assert any("import typing" in line for line in lines)
 
 
 def test_unnamed_union_fields_present(dummy_stub_lines):

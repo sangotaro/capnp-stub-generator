@@ -23,7 +23,7 @@ class TestServerContextParameter:
         stub_content = stub_file.read_text()
 
         # Check that CallContext types are generated inside Server class
-        assert "CallContext(Protocol):" in stub_content
+        assert "CallContext(typing.Protocol):" in stub_content
         # ResultsBuilder no longer exists - CallContext.results now points to NamedTuple
 
         # Check that Server methods have _context parameter
@@ -124,10 +124,10 @@ def test_server_context_parameter_summary(generate_calculator_stubs):
     import re
 
     # Count CallContext types generated
-    callcontext_count = len(re.findall(r"class \w+CallContext\(Protocol\):", content))
+    callcontext_count = len(re.findall(r"class \w+CallContext\(typing\.Protocol\):", content))
 
     # Count NamedTuple result types (now with "Tuple" suffix)
-    namedtuple_count = len(re.findall(r"class \w+ResultTuple\(NamedTuple\):", content))
+    namedtuple_count = len(re.findall(r"class \w+ResultTuple\(typing\.NamedTuple\):", content))
 
     # Count Server methods with _context
     server_methods_with_context = len(re.findall(r"def \w+\([^)]*_context:[^)]*\)", content))

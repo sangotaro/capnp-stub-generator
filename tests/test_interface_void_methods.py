@@ -20,7 +20,7 @@ def test_void_methods_return_result_protocol(tmp_path: Path):
     ), "Void methods should return nested Client.Result protocol for promise pipelining"
 
     # CloseRequest should exist at module level
-    assert "class CloseRequest(Protocol):" in content
+    assert "class CloseRequest(typing.Protocol):" in content
 
 
 def test_void_method_send_returns_result(tmp_path: Path):
@@ -31,7 +31,7 @@ def test_void_method_send_returns_result(tmp_path: Path):
     content = stub_path.read_text()
 
     # CloseRequest.send() should return Client.CloseResult (consistent with non-void methods)
-    assert "class CloseRequest(Protocol):" in content
+    assert "class CloseRequest(typing.Protocol):" in content
     assert (
         "def send(self) -> _ChannelInterfaceModule._ReaderInterfaceModule.ReaderClient.CloseResult:" in content
         or "def send(self) -> _ChannelInterfaceModule._WriterInterfaceModule.WriterClient.CloseResult:" in content
@@ -46,7 +46,7 @@ def test_void_result_protocol_is_awaitable(tmp_path: Path):
     content = stub_path.read_text()
 
     # CloseResult should be Awaitable[None]
-    assert "class CloseResult(Awaitable[None], Protocol): ..." in content, (
+    assert "class CloseResult(Awaitable[None], typing.Protocol): ..." in content, (
         "CloseResult should be Awaitable[None] for void methods"
     )
 

@@ -31,9 +31,9 @@ def test_primitives_and_lists_imports_and_types():
     # assert "Sequence" in content
     # assert "MutableSequence" in content
     # Literal now appears for list init overloads, overload appears for typed init methods
-    assert "from typing import" in content
-    assert "Literal" in content
-    assert "overload" in content
+    assert "import typing" in content
+    assert "typing.Literal" in content
+    assert "typing.overload" in content
     # Basic field annotations present (now as properties)
     assert any("def aBool(self) -> bool" in line for line in lines)
     # List fields use specific list classes
@@ -49,25 +49,25 @@ def test_nested_enum_and_literal_and_overload():
     # Sequence import still expected for list fields (only for nested lists or setters)
     # assert any(line.startswith("from collections.abc import") and "Sequence" in line for line in lines)
     # Now overload is expected (for list init overloads)
-    assert any("overload" in line for line in lines if line.startswith("from typing import"))
+    assert any("typing.overload" in line for line in lines)
 
 
 def test_unions_literal_and_overload_and_which():
     stub_path = _get_stub_path("unions.capnp")
     lines = _read(stub_path)
     # Expect Literal import (union which methods)
-    assert any(line.startswith("from typing import") and "Literal" in line for line in lines)
+    assert any("typing.Literal" in line for line in lines)
     # Overload is only imported when there are multiple init methods (2+)
     # unions.capnp doesn't have multiple init methods, so no overload import
     # 'which' function should appear for discriminantCount > 0
-    assert any(re.match(r"^\s*def which\(self\) -> Literal\[", line) for line in lines)
+    assert any(re.match(r"^\s*def which\(self\) -> typing\.Literal\[", line) for line in lines)
 
 
 def test_interfaces_protocol_and_any_and_iterator():
     stub_path = _get_stub_path("interfaces.capnp")
     lines = _read(stub_path)
     # Protocol import expected
-    assert any(line.startswith("from typing import") and "Protocol" in line for line in lines)
+    assert any("import typing" in line for line in lines)
     # Interface methods now have result types
     # greet should have GreetResult return type (not bare str)
     assert any("def greet" in line and "name: str" in line and "GreetResult" in line for line in lines)

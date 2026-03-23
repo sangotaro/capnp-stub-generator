@@ -325,9 +325,9 @@ class TestParameterInfo:
         """Test server parameter formatting."""
         param = ParameterInfo(
             name="data",
-            client_type="DataStruct | dict[str, Any]",
+            client_type="DataStruct | dict[str, typing.Any]",
             server_type="DataStructReader",
-            request_type="DataStruct | dict[str, Any]",
+            request_type="DataStruct | dict[str, typing.Any]",
         )
 
         assert param.to_server_param() == "data: DataStructReader"
@@ -338,23 +338,23 @@ class TestParameterInfo:
             name="items",
             client_type="Sequence[Item]",
             server_type="Sequence[ItemReader]",
-            request_type="Sequence[Item] | Sequence[dict[str, Any]]",
+            request_type="Sequence[Item] | Sequence[dict[str, typing.Any]]",
         )
 
-        assert param.to_request_param() == "items: Sequence[Item] | Sequence[dict[str, Any]] | None = None"
+        assert param.to_request_param() == "items: Sequence[Item] | Sequence[dict[str, typing.Any]] | None = None"
 
     def test_different_types_for_contexts(self):
         """Test that different contexts can have different types."""
         param = ParameterInfo(
             name="obj",
-            client_type="MyStruct | dict[str, Any]",
+            client_type="MyStruct | dict[str, typing.Any]",
             server_type="MyStructReader",
             request_type="MyStruct",
         )
 
-        assert "dict[str, Any]" in param.to_client_param()
+        assert "dict[str, typing.Any]" in param.to_client_param()
         assert "Reader" in param.to_server_param()
-        assert "dict[str, Any]" not in param.to_request_param()
+        assert "dict[str, typing.Any]" not in param.to_request_param()
 
 
 class TestMethodSignatureCollection:
@@ -383,7 +383,7 @@ class TestMethodSignatureCollection:
         """Test setting Request Protocol class lines."""
         collection = MethodSignatureCollection("multiply")
         lines = [
-            "class MultiplyRequest(Protocol):",
+            "class MultiplyRequest(typing.Protocol):",
             "    x: int",
             "    y: int",
             "    def send(self) -> Awaitable[int]: ...",
@@ -426,13 +426,13 @@ class TestMethodSignatureCollection:
         collection.set_client_method(["def calculate(...) -> Awaitable[int]: ..."])
         collection.set_request_class(
             [
-                "class CalculateRequest(Protocol):",
+                "class CalculateRequest(typing.Protocol):",
                 "    def send(self) -> Awaitable[int]: ...",
             ]
         )
         # collection.set_result_class([])  # Removed
         collection.set_request_helper(["def calculate_request(...) -> CalculateRequest: ..."])
-        # collection.set_server_method("    def calculate(self, context: Any) -> int: ...") # Removed
+        # collection.set_server_method("    def calculate(self, context: typing.Any) -> int: ...") # Removed
 
         # Verify all components are set
         assert len(collection.client_method_lines) == 1
@@ -456,8 +456,8 @@ class TestServerMethodsCollection:
         """Test adding server method signatures."""
         collection = ServerMethodsCollection()
 
-        collection.add_server_method("    def method1(self, context: Any) -> None: ...")
-        collection.add_server_method("    def method2(self, context: Any, x: int) -> int: ...")
+        collection.add_server_method("    def method1(self, context: typing.Any) -> None: ...")
+        collection.add_server_method("    def method2(self, context: typing.Any, x: int) -> int: ...")
 
         assert len(collection.server_methods) == 2
         assert collection.has_methods() is True
@@ -484,7 +484,7 @@ class TestServerMethodsCollection:
     def test_has_methods_true(self):
         """Test has_methods returns True after adding methods."""
         collection = ServerMethodsCollection()
-        collection.add_server_method("    def test(self, context: Any) -> None: ...")
+        collection.add_server_method("    def test(self, context: typing.Any) -> None: ...")
 
         assert collection.has_methods() is True
 
@@ -506,9 +506,9 @@ class TestServerMethodsCollection:
         collection = ServerMethodsCollection()
 
         # Add multiple methods
-        collection.add_server_method("    def add(self, context: Any, x: int, y: int) -> int: ...")
-        collection.add_server_method("    def subtract(self, context: Any, x: int, y: int) -> int: ...")
-        collection.add_server_method("    def multiply(self, context: Any, x: int, y: int) -> int: ...")
+        collection.add_server_method("    def add(self, context: typing.Any, x: int, y: int) -> int: ...")
+        collection.add_server_method("    def subtract(self, context: typing.Any, x: int, y: int) -> int: ...")
+        collection.add_server_method("    def multiply(self, context: typing.Any, x: int, y: int) -> int: ...")
 
         # Add some NamedTuples
         collection.add_namedtuple("AddResult", [("sum", "int")])
@@ -560,7 +560,7 @@ class TestInterfaceDTOIntegration:
 
         # Build server collection
         server_collection = ServerMethodsCollection()
-        server_collection.add_server_method(f"    def add(self, context: Any, {param.to_server_param()}) -> int: ...")
+        server_collection.add_server_method(f"    def add(self, context: typing.Any, {param.to_server_param()}) -> int: ...")
 
         # Verify everything works together
         assert context.type_name == "Calculator"
@@ -576,8 +576,8 @@ class TestInterfaceDTOIntegration:
         # Process multiple methods
         for method_name in ["add", "subtract", "multiply"]:
             # method_collection.set_server_method(...) # Removed
-            server_collection.add_server_method(f"    def {method_name}(self, context: Any) -> int: ...")
+            server_collection.add_server_method(f"    def {method_name}(self, context: typing.Any) -> int: ...")
 
         # Verify all methods collected
         assert len(server_collection.server_methods) == 3
-        assert all("context: Any" in sig for sig in server_collection.server_methods)
+        assert all("context: typing.Any" in sig for sig in server_collection.server_methods)

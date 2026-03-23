@@ -38,7 +38,7 @@ def test_simple_interface_inheritance(generated_dir):
     """Test that an interface extending another interface shows inheritance.
 
     ClimateInstance extends Identifiable, so the generated stub should show:
-    - class ClimateInstance(Identifiable, Protocol):
+    - class ClimateInstance(Identifiable, typing.Protocol):
     - class Server(Identifiable.Server):
     """
     # Generate stubs for model.capnp which has ClimateInstance extends Identifiable

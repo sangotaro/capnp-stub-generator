@@ -351,36 +351,23 @@ class Writer:
 
         if self._typing_imports:
             # Consolidate typing imports deterministically.
-            # Iterator and Sequence should be imported from collections.abc.
-            order = [
-                "Iterator",
-                "Literal",
-                "Sequence",
-                "overload",
-                "override",
-                "Generic",
-                "TypeVar",
-                "Union",
-                "Protocol",
-                "Any",
-            ]
-            names = [n for n in order if n in self._typing_imports]
-            extra = sorted(self._typing_imports.difference(set(names)))
-            names.extend(extra)
+            # Iterator, Sequence, etc. should be imported from collections.abc.
+            # All other typing names use `import typing` + `typing.X` to avoid
+            # name collisions with Cap'n Proto field names (e.g., a field named
+            # "override" would shadow `from typing import override`).
+            collections_abc_names_set = {"Iterator", "Sequence", "Awaitable", "MutableSequence", "Callable"}
+            order = ["Iterator", "Sequence", "Awaitable", "MutableSequence", "Callable"]
+            collections_abc_names = [n for n in order if n in self._typing_imports]
+            extra = sorted(self._typing_imports.intersection(collections_abc_names_set).difference(set(collections_abc_names)))
+            collections_abc_names.extend(extra)
 
-            # Split names into collections.abc vs typing
-            collections_abc_names = [
-                n for n in names if n in ("Iterator", "Sequence", "Awaitable", "MutableSequence", "Callable")
-            ]
-            typing_names = [
-                n for n in names if n not in ("Iterator", "Sequence", "Awaitable", "MutableSequence", "Callable")
-            ]
+            has_typing_names = bool(self._typing_imports.difference(collections_abc_names_set))
 
             if collections_abc_names:
                 import_lines.append("from collections.abc import " + ", ".join(collections_abc_names))
 
-            if typing_names:
-                import_lines.append("from typing import " + ", ".join(typing_names))
+            if has_typing_names:
+                import_lines.append("import typing")
 
         return import_lines
 
@@ -449,8 +436,8 @@ class Writer:
         buf_param = helper.TypeHintedVariable("buf", [helper.TypeHint("bytes", primary=True)])
 
         # from_bytes overload 1: no builder parameter (returns Reader)
-        self.scope.add("@override")
-        self.scope.add(helper.new_decorator("overload"))
+        self.scope.add("@typing.override")
+        self.scope.add(helper.new_decorator("typing.overload"))
         self.scope.add(
             helper.new_function(
                 "from_bytes",
@@ -460,8 +447,8 @@ class Writer:
         )
 
         # from_bytes overload 2: builder=False (returns Reader)
-        builder_kwarg = helper.TypeHintedVariable("builder", [helper.TypeHint("Literal[False]", primary=True)])
-        self.scope.add(helper.new_decorator("overload"))
+        builder_kwarg = helper.TypeHintedVariable("builder", [helper.TypeHint("typing.Literal[False]", primary=True)])
+        self.scope.add(helper.new_decorator("typing.overload"))
         self.scope.add(
             helper.new_function(
                 "from_bytes",
@@ -471,8 +458,8 @@ class Writer:
         )
 
         # from_bytes overload 3: builder=True (returns Builder)
-        builder_kwarg_true = helper.TypeHintedVariable("builder", [helper.TypeHint("Literal[True]", primary=True)])
-        self.scope.add(helper.new_decorator("overload"))
+        builder_kwarg_true = helper.TypeHintedVariable("builder", [helper.TypeHint("typing.Literal[True]", primary=True)])
+        self.scope.add(helper.new_decorator("typing.overload"))
         self.scope.add(
             helper.new_function(
                 "from_bytes",
@@ -482,7 +469,7 @@ class Writer:
         )
 
         # from_bytes_packed method - returns bare _DynamicStructReader, not override
-        self.scope.add("@override")
+        self.scope.add("@typing.override")
         self.scope.add(
             helper.new_function(
                 "from_bytes_packed",
@@ -501,10 +488,10 @@ class Writer:
         """
         self._add_typing_import("IO")
 
-        file_param = helper.TypeHintedVariable("file", [helper.TypeHint("IO[str] | IO[bytes]", primary=True)])
+        file_param = helper.TypeHintedVariable("file", [helper.TypeHint("typing.IO[str] | typing.IO[bytes]", primary=True)])
 
         # read method
-        self.scope.add(helper.new_decorator("override"))
+        self.scope.add(helper.new_decorator("typing.override"))
         self.scope.add(
             helper.new_function(
                 "read",
@@ -514,7 +501,7 @@ class Writer:
         )
 
         # read_packed method
-        self.scope.add(helper.new_decorator("override"))
+        self.scope.add(helper.new_decorator("typing.override"))
         self.scope.add(
             helper.new_function(
                 "read_packed",
@@ -568,7 +555,7 @@ class Writer:
         # Handle AnyStruct fields
         if field.is_any_struct:
             getter_type = field.get_type_with_affixes([helper.BUILDER_NAME])
-            setter_type = "AnyStruct | dict[str, Any]"
+            setter_type = "AnyStruct | dict[str, typing.Any]"
             self._needs_anystruct_alias = True
             self._add_typing_import("Any")
             return getter_type, setter_type
@@ -576,7 +563,7 @@ class Writer:
         # Handle AnyList fields (accepts Sequence/list)
         if field.is_any_list:
             getter_type = field.get_type_with_affixes([helper.BUILDER_NAME])
-            setter_type = "AnyList | Sequence[Any]"
+            setter_type = "AnyList | Sequence[typing.Any]"
             self._needs_anylist_alias = True
             self._add_typing_import("Sequence")
             self._add_typing_import("Any")
@@ -599,7 +586,7 @@ class Writer:
                     self._add_typing_import("MutableSequence")
                 # Setter accepts Builder/Reader types + dict, but NOT the base type
                 setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
-                setter_type = field.get_type_with_affixes(setter_types) + " | Sequence[dict[str, Any]]"
+                setter_type = field.get_type_with_affixes(setter_types) + " | Sequence[dict[str, typing.Any]]"
                 self._add_typing_import("Sequence")
                 self._add_typing_import("Any")
             elif field.list_element_setter_type:
@@ -613,7 +600,7 @@ class Writer:
                 # For non-list structs: setter accepts Builder/Reader + dict
                 getter_type = field.get_type_with_affixes([helper.BUILDER_NAME])
                 setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
-                setter_type = field.get_type_with_affixes(setter_types) + " | dict[str, Any]"
+                setter_type = field.get_type_with_affixes(setter_types) + " | dict[str, typing.Any]"
                 self._add_typing_import("Any")
         # For interface fields: getter returns Protocol, setter accepts Protocol | Server
         elif len(field.type_hints) > 1 and any(".Server" in str(h) for h in field.type_hints):
@@ -715,10 +702,10 @@ class Writer:
         # Add init method overloads for union/group fields (return their Builder type)
         for field_name, field_type in init_choices:
             if not added_override:
-                self.scope.add("@override")
+                self.scope.add("@typing.override")
                 added_override = True
             if use_overload:
-                self.scope.add(helper.new_decorator("overload"))
+                self.scope.add(helper.new_decorator("typing.overload"))
             # Build builder type name - try flat alias first
             builder_alias = self._get_flat_builder_alias(field_type)
             builder_type = builder_alias or self._build_scoped_builder_type(field_type)
@@ -726,7 +713,7 @@ class Writer:
             # Parameter must be named "field" to match base class
             init_params = [
                 "self",
-                helper.TypeHintedVariable("field", [helper.TypeHint(f'Literal["{field_name}"]', primary=True)]),
+                helper.TypeHintedVariable("field", [helper.TypeHint(f'typing.Literal["{field_name}"]', primary=True)]),
                 helper.TypeHintedVariable(
                     "size", [helper.TypeHint("int", primary=True), helper.TypeHint("None")], default="None"
                 ),
@@ -743,15 +730,15 @@ class Writer:
         # Add init method overloads for lists (properly typed)
         for field_name, builder_type in list_init_choices:
             if not added_override:
-                self.scope.add("@override")
+                self.scope.add("@typing.override")
                 added_override = True
             if use_overload:
-                self.scope.add(helper.new_decorator("overload"))
+                self.scope.add(helper.new_decorator("typing.overload"))
 
             # Parameter must be named "field" to match base class
             init_params_list = [
                 "self",
-                helper.TypeHintedVariable("field", [helper.TypeHint(f'Literal["{field_name}"]', primary=True)]),
+                helper.TypeHintedVariable("field", [helper.TypeHint(f'typing.Literal["{field_name}"]', primary=True)]),
                 helper.TypeHintedVariable(
                     "size", [helper.TypeHint("int", primary=True), helper.TypeHint("None")], default="None"
                 ),
@@ -768,9 +755,9 @@ class Writer:
         # Add catchall overload if we added any specific overloads
         if use_overload:
             if not added_override:
-                self.scope.add("@override")
+                self.scope.add("@typing.override")
                 added_override = True
-            self.scope.add(helper.new_decorator("overload"))
+            self.scope.add(helper.new_decorator("typing.overload"))
             catchall_params = [
                 "self",
                 helper.TypeHintedVariable("field", [helper.TypeHint("str", primary=True)]),
@@ -782,7 +769,7 @@ class Writer:
                 helper.new_function(
                     "init",
                     parameters=catchall_params,
-                    return_type="Any",
+                    return_type="typing.Any",
                 )
             )
 
@@ -798,8 +785,8 @@ class Writer:
             field_names = [
                 f'"{field.name}"' for field in schema.node.struct.fields if field.discriminantValue != DISCRIMINANT_NONE
             ]
-            return_type = helper.new_type_group("Literal", field_names)
-            self.scope.add("@override")
+            return_type = helper.new_type_group("typing.Literal", field_names)
+            self.scope.add("@typing.override")
             self.scope.add(helper.new_function("which", parameters=["self"], return_type=return_type))
 
     # ===== Struct Generation Helper Methods =====
@@ -850,7 +837,7 @@ class Writer:
                 field_type = "AnyStruct"
                 self._needs_anystruct_alias = True
                 type_hints = [helper.TypeHint(field_type, primary=True)]
-                type_hints.append(helper.TypeHint("dict[str, Any]"))
+                type_hints.append(helper.TypeHint("dict[str, typing.Any]"))
                 self._add_typing_import("Any")
                 type_hints.append(helper.TypeHint("None"))
             # Handle AnyList fields specially
@@ -858,7 +845,7 @@ class Writer:
                 field_type = "AnyList"
                 self._needs_anylist_alias = True
                 type_hints = [helper.TypeHint(field_type, primary=True)]
-                type_hints.append(helper.TypeHint("Sequence[Any]"))
+                type_hints.append(helper.TypeHint("Sequence[typing.Any]"))
                 self._add_typing_import("Sequence")
                 self._add_typing_import("Any")
                 type_hints.append(helper.TypeHint("None"))
@@ -881,11 +868,11 @@ class Writer:
                 if slot_field.has_type_hint_with_builder_affix:
                     if slot_field.nesting_depth == 0:
                         # Non-list struct fields accept dict directly
-                        type_hints.append(helper.TypeHint("dict[str, Any]"))
+                        type_hints.append(helper.TypeHint("dict[str, typing.Any]"))
                         self._add_typing_import("Any")
                     elif slot_field.nesting_depth == 1:
                         # List of struct fields accept Sequence[dict]
-                        type_hints.append(helper.TypeHint("Sequence[dict[str, Any]]"))
+                        type_hints.append(helper.TypeHint("Sequence[dict[str, typing.Any]]"))
                         self._add_typing_import("Sequence")
                         self._add_typing_import("Any")
                 type_hints.append(helper.TypeHint("None"))
@@ -899,10 +886,10 @@ class Writer:
             new_message_params.append(field_param)
 
         # Add **kwargs: Any to match base signature
-        new_message_params.append("**kwargs: Any")
+        new_message_params.append("**kwargs: typing.Any")
 
         # Add as instance method with @override decorator
-        self.scope.add("@override")
+        self.scope.add("@typing.override")
         self.scope.add(helper.new_function("new_message", new_message_params, builder_type_name))
         # Add __call__ with same signature (pycapnp allows StructModule() as shorthand for new_message())
         self.scope.add(helper.new_function("__call__", new_message_params, builder_type_name))
@@ -962,7 +949,7 @@ class Writer:
         self._add_typing_import("override")
         self._add_typing_import("Any")
         self._add_typing_import("Callable")
-        self.scope.add("@override")
+        self.scope.add("@typing.override")
         self.scope.add(
             helper.new_function(
                 "as_builder",
@@ -1018,7 +1005,7 @@ class Writer:
 
         # Add as_reader method with override decorator
         self._add_typing_import("override")
-        self.scope.add("@override")
+        self.scope.add("@typing.override")
         self.scope.add(
             helper.new_function(
                 "as_reader",
@@ -1159,7 +1146,7 @@ class Writer:
             return_type = fully_qualified_interface
 
         self._add_typing_import("override")
-        self.scope.add("@override")
+        self.scope.add("@typing.override")
         self.scope.add(
             helper.new_function(
                 "_new_client",
@@ -1202,7 +1189,7 @@ class Writer:
             builder_type = builder_alias or self._build_scoped_builder_type(struct_name)
 
             # Setter accepts Reader, Builder, or dict
-            setter_type = f"{reader_type} | {builder_type} | dict[str, Any]"
+            setter_type = f"{reader_type} | {builder_type} | dict[str, typing.Any]"
             self._add_typing_import("Any")
 
             # Base name for list class (sanitize dots)
@@ -1225,7 +1212,7 @@ class Writer:
             builder_type = inner_builder_alias
 
             # Setter accepts Reader, Builder, or Sequence
-            setter_type = f"{reader_type} | {builder_type} | Sequence[Any]"
+            setter_type = f"{reader_type} | {builder_type} | Sequence[typing.Any]"
             self._add_typing_import("Sequence")
             self._add_typing_import("Any")
 
@@ -1313,27 +1300,27 @@ class Writer:
         # Reader class
         root_scope.add(f"class {list_class_name}:")
         root_scope.add("    class Reader(_DynamicListReader):")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add("        def __len__(self) -> int: ...")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add(f"        def __getitem__(self, key: int) -> {reader_type}: ...")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add(f"        def __iter__(self) -> Iterator[{reader_type}]: ...")
 
         # Builder class
         root_scope.add("    class Builder(_DynamicListBuilder):")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add("        def __len__(self) -> int: ...")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add(f"        def __getitem__(self, key: int) -> {builder_type}: ...")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add(f"        def __setitem__(self, key: int, value: {setter_type}) -> None: ...")
-        root_scope.add("        @override")
+        root_scope.add("        @typing.override")
         root_scope.add(f"        def __iter__(self) -> Iterator[{builder_type}]: ...")
 
         if has_init:
             init_sig = ", ".join(init_args)
-            root_scope.add("        @override")
+            root_scope.add("        @typing.override")
             root_scope.add(f"        def init({init_sig}) -> {builder_type}: ...")
 
         root_scope.add("")
@@ -1406,11 +1393,11 @@ class Writer:
             try:
                 type_name = self.get_type_name(field.slot.type)
             except Exception:
-                type_name = "Any"
+                type_name = "typing.Any"
                 self._add_typing_import("Union")
             # For interfaces, type_name from get_type_name is now the Protocol name (_<Name>InterfaceModule)
             # E.g., "_HeartbeatInterfaceModule" or "Calculator._FunctionInterfaceModule"
-            if type_name != "Any":
+            if type_name != "typing.Any":
                 # Protocol name is already in _<Name>InterfaceModule format
                 protocol_type_name = type_name
 
@@ -1521,7 +1508,7 @@ class Writer:
                 enum_values = [e.name for e in schema.node.enum.enumerants]
                 if enum_values:
                     literal_values = ", ".join(f'"{v}"' for v in enum_values)
-                    reader_enum_type = f"_DynamicEnum[Literal[{literal_values}]]"
+                    reader_enum_type = f"_DynamicEnum[typing.Literal[{literal_values}]]"
             except (AttributeError, TypeError):
                 pass
 
@@ -1670,7 +1657,7 @@ class Writer:
 
         # Fallback
         self._add_typing_import("Any")
-        return helper.TypeHintedVariable(helper.sanitize_name(field.name), [helper.TypeHint("Any", primary=True)])
+        return helper.TypeHintedVariable(helper.sanitize_name(field.name), [helper.TypeHint("typing.Any", primary=True)])
 
     def gen_const(self, schema: _ParsedSchema) -> None:
         """Generate a `const` object.
@@ -2325,12 +2312,12 @@ class Writer:
                 reader_alias = self._get_flat_reader_alias(base_type)
                 if builder_alias and reader_alias:
                     # Type is defined in this module, use flat aliases
-                    client_type = f"{builder_alias} | {reader_alias} | dict[str, Any]"
+                    client_type = f"{builder_alias} | {reader_alias} | dict[str, typing.Any]"
                     server_type = reader_alias
                     request_type = builder_alias
                 else:
                     # Type is imported, use the module type with dict union
-                    client_type = f"{base_type} | dict[str, Any]"
+                    client_type = f"{base_type} | dict[str, typing.Any]"
                     server_type = reader_type
                     request_type = builder_type  # Request fields use Builder type
 
@@ -2343,7 +2330,7 @@ class Writer:
                 self._add_typing_import("Any")
 
                 # Client accepts Builder, Reader, or Sequence (list/tuple)
-                client_type = f"{builder_alias} | {reader_alias} | Sequence[Any]"
+                client_type = f"{builder_alias} | {reader_alias} | Sequence[typing.Any]"
 
                 # Server receives Reader
                 server_type = reader_alias
@@ -2554,7 +2541,7 @@ class Writer:
         lines: list[str] = []
 
         # Class declaration
-        lines.append(f"class {request_class_name}(Protocol):")
+        lines.append(f"class {request_class_name}(typing.Protocol):")
 
         # Add parameter fields
         for param in parameters:
@@ -2572,20 +2559,20 @@ class Writer:
             # Add list init overloads
             if list_params:
                 for field_name, list_builder_type in list_params:
-                    lines.append("    @overload")
+                    lines.append("    @typing.overload")
                     lines.append(
-                        f'    def init(self, name: Literal["{field_name}"], '
+                        f'    def init(self, name: typing.Literal["{field_name}"], '
                         + f"size: int = ...) -> {list_builder_type}: ..."
                     )
 
             # Add struct init overloads
             for field_name, builder_type in struct_params:
-                lines.append("    @overload")
-                lines.append(f'    def init(self, name: Literal["{field_name}"]) -> {builder_type}: ...')
+                lines.append("    @typing.overload")
+                lines.append(f'    def init(self, name: typing.Literal["{field_name}"]) -> {builder_type}: ...')
 
             # Add a catchall overload for pyright
-            lines.append("    @overload")
-            lines.append("    def init(self, name: str, size: int = ...) -> Any: ...")
+            lines.append("    @typing.overload")
+            lines.append("    def init(self, name: str, size: int = ...) -> typing.Any: ...")
 
         # Add send() method - returns the Result directly for pipelining
         send_return = result_type
@@ -2618,7 +2605,7 @@ class Writer:
 
             # Class declaration - Protocol that is Awaitable and has result fields
             self._add_typing_import("Awaitable")
-            lines.append(f"class {result_class_name}(Awaitable[{result_class_name}], Protocol):")
+            lines.append(f"class {result_class_name}(Awaitable[{result_class_name}], typing.Protocol):")
 
             # Check if the struct has a union (for which() method)
             has_union = False
@@ -2721,13 +2708,13 @@ class Writer:
 
                         lines.append(f"    {rf}: {field_type}")
                     except Exception:
-                        lines.append(f"    {rf}: Any")
+                        lines.append(f"    {rf}: typing.Any")
 
                 # Add which() method if the struct has a union
                 if has_union and union_fields:
                     self._add_typing_import("Literal")
                     union_literal = ", ".join([f'"{f}"' for f in union_fields])
-                    lines.append(f"    def which(self) -> Literal[{union_literal}]: ...")
+                    lines.append(f"    def which(self) -> typing.Literal[{union_literal}]: ...")
 
             return lines
 
@@ -2736,7 +2723,7 @@ class Writer:
             lines: list[str] = []
             result_class_name = result_type
             self._add_typing_import("Awaitable")
-            lines.append(f"class {result_class_name}(Awaitable[None], Protocol):")
+            lines.append(f"class {result_class_name}(Awaitable[None], typing.Protocol):")
             lines.append("    ...")  # Empty protocol body
             return lines
 
@@ -2754,7 +2741,7 @@ class Writer:
         else:
             # Client results are promises (Awaitable) and Protocols
             self._add_typing_import("Awaitable")
-            lines.append(f"class {result_class_name}(Awaitable[{result_class_name}], Protocol):")
+            lines.append(f"class {result_class_name}(Awaitable[{result_class_name}], typing.Protocol):")
 
         # Collect fields for init() method generation (server only)
         init_fields: list[tuple[str, str]] = []
@@ -2879,7 +2866,7 @@ class Writer:
                             # Setter accepts Builder | Reader | Sequence
                             self._add_typing_import("Sequence")
                             self._add_typing_import("Any")
-                            setter_type = f"{builder_alias} | {reader_alias} | Sequence[Any]"
+                            setter_type = f"{builder_alias} | {reader_alias} | Sequence[typing.Any]"
                         elif field_type_enum == capnp_types.CapnpElementType.STRUCT:
                             # Getter returns Builder
                             # builder_alias might be None if not defined in this module
@@ -2888,7 +2875,7 @@ class Writer:
                             getter_type = b_type
                             # Setter accepts Builder | Reader | dict
                             self._add_typing_import("Any")
-                            setter_type = f"{field_type} | dict[str, Any]"
+                            setter_type = f"{field_type} | dict[str, typing.Any]"
 
                         lines.append("    @property")
                         lines.append(f"    def {rf}(self) -> {getter_type}: ...")
@@ -2898,7 +2885,7 @@ class Writer:
                         lines.append(f"    {rf}: {field_type}")
                 except Exception as e:
                     logger.warning(f"Could not get field type for {rf}: {e}")
-                    lines.append(f"    {rf}: Any")
+                    lines.append(f"    {rf}: typing.Any")
 
             # Add init() methods for server results
             if for_server and init_fields:
@@ -2907,14 +2894,14 @@ class Writer:
                 self._add_typing_import("Any")
 
                 for field_name, return_type in init_fields:
-                    lines.append("    @overload")
+                    lines.append("    @typing.overload")
                     lines.append(
-                        f'    def init(self, field: Literal["{field_name}"], size: int | None = None) -> {return_type}: ...'
+                        f'    def init(self, field: typing.Literal["{field_name}"], size: int | None = None) -> {return_type}: ...'
                     )
 
                 # Catch-all init
-                lines.append("    @overload")
-                lines.append("    def init(self, field: str, size: int | None = None) -> Any: ...")
+                lines.append("    @typing.overload")
+                lines.append("    def init(self, field: str, size: int | None = None) -> typing.Any: ...")
 
         return lines
 
@@ -3109,7 +3096,7 @@ class Writer:
         param_parts = ["self"]
         param_parts.extend([p.to_server_param() for p in parameters])
         param_parts.append(f"_context: {context_type}")
-        param_parts.append("**kwargs: Any")
+        param_parts.append("**kwargs: typing.Any")
         param_str = ", ".join(param_parts)
 
         # Determine return type
@@ -3265,7 +3252,7 @@ class Writer:
         method_name = helper.sanitize_name(method_info.method_name)
         params_class_name = f"{method_name.title()}Params"
 
-        lines = [helper.new_class_declaration(params_class_name, ["Protocol"])]
+        lines = [helper.new_class_declaration(params_class_name, ["typing.Protocol"])]
 
         for param in parameters:
             lines.append(f"    {param.name}: {param.server_type}")
@@ -3296,7 +3283,7 @@ class Writer:
         method_name = helper.sanitize_name(method_info.method_name)
         context_name = f"{method_name.title()}CallContext"
 
-        lines = [helper.new_class_declaration(context_name, ["Protocol"])]
+        lines = [helper.new_class_declaration(context_name, ["typing.Protocol"])]
 
         scope_path = self._get_scope_path()
 
@@ -3324,7 +3311,7 @@ class Writer:
                     fully_qualified_results = f"Server.{result_type_for_context}"
             else:
                 # Shouldn't happen, but fallback
-                fully_qualified_results = "Any"
+                fully_qualified_results = "typing.Any"
 
             # Make results a read-only property
             lines.append("    @property")
@@ -3507,7 +3494,7 @@ class Writer:
             self._add_typing_import("NamedTuple")
             for result_type, fields in server_collection.namedtuples.items():
                 # Generate NamedTuple class
-                self.scope.add(f"    class {result_type}(NamedTuple):")
+                self.scope.add(f"    class {result_type}(typing.NamedTuple):")
                 if fields:
                     for field_name, field_type in fields:
                         self.scope.add(f"        {field_name}: {field_type}")
@@ -4453,7 +4440,7 @@ class Writer:
 
         if self.type_vars:
             for name in sorted(self.type_vars):
-                out.append(f'{name} = TypeVar("{name}")')
+                out.append(f'{name} = typing.TypeVar("{name}")')
             out.append("")
 
         out.extend(self.scope.lines)
@@ -4474,7 +4461,7 @@ class Writer:
                         # For enums, generate a single type alias that accepts int | Literal[...]
                         # This allows both Operator.add (int) and string literals to be accepted
                         literal_values = ", ".join(f'"{v}"' for v in enum_values)
-                        out.append(f"type {alias_name} = int | Literal[{literal_values}]")
+                        out.append(f"type {alias_name} = int | typing.Literal[{literal_values}]")
                     else:
                         # Regular type alias (use type statement for consistency)
                         out.append(f"type {alias_name} = {full_path}")
@@ -4501,7 +4488,7 @@ class Writer:
 
         # Add NamedTuple import if we have server namedtuples
         if self._all_server_namedtuples:
-            out.append("from typing import NamedTuple")
+            out.append("import typing")
 
         out.append("capnp.remove_import_hook()")
         out.append("here = os.path.dirname(os.path.abspath(__file__))")
@@ -4584,7 +4571,7 @@ class Writer:
                     field_list = [f'("{field_name}", object)' for field_name, _ in fields]
                     out.append(
                         f"{runtime_interface_name}.Server.{namedtuple_name} = "
-                        + f"NamedTuple('{namedtuple_name}', [{', '.join(field_list)}])"
+                        + f"typing.NamedTuple('{namedtuple_name}', [{', '.join(field_list)}])"
                     )
 
         return "\n".join(out)

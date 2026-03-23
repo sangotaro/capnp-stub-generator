@@ -9,7 +9,7 @@ def test_enum_type_alias_exists(calculator_stubs):
     content = stub_file.read_text()
 
     # Check that the enum type alias exists (flattened name)
-    assert 'type CalculatorOperatorEnum = int | Literal["add", "subtract", "multiply", "divide"]' in content
+    assert 'type CalculatorOperatorEnum = int | typing.Literal["add", "subtract", "multiply", "divide"]' in content
 
 
 def test_enum_type_alias_accepts_literals(calculator_stubs):
