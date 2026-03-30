@@ -1501,16 +1501,8 @@ class Writer:
         try:
             type_name = self.get_type_name(field.slot.type)
 
-            # Build _DynamicEnum[Literal["val1", "val2", ...]] for the reader type
-            # Get enum values directly from the schema (works for cross-module enums too)
+            # Reader enum type is _DynamicEnum (not Generic - matches runtime)
             reader_enum_type = "_DynamicEnum"
-            try:
-                enum_values = [e.name for e in schema.node.enum.enumerants]
-                if enum_values:
-                    literal_values = ", ".join(f'"{v}"' for v in enum_values)
-                    reader_enum_type = f"_DynamicEnum[typing.Literal[{literal_values}]]"
-            except (AttributeError, TypeError):
-                pass
 
             return helper.TypeHintedVariable(
                 helper.sanitize_name(field.name),

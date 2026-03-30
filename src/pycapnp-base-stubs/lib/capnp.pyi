@@ -10,9 +10,7 @@ from collections.abc import (
 )
 from contextlib import AbstractContextManager, asynccontextmanager
 from ssl import SSLContext
-from typing import IO, Any, Generic, Literal, TypeVar, overload
-
-_EnumStr = TypeVar("_EnumStr", bound=str)
+from typing import IO, Any, Literal, overload
 
 from .._internal import CapnpModule as _CapnpModule
 from .._internal import CapnpTypesModule as _CapnpTypesModule
@@ -1598,17 +1596,16 @@ class _EventLoop:
     Internal class for managing the KJ event loop.
     """
 
-class _DynamicEnum(Generic[_EnumStr]):
+class _DynamicEnum:
     """A runtime enum value returned when reading an enum field from a struct reader/builder.
 
     Unlike the integer values on `_EnumModule`, reading an enum field from a
     ``_DynamicStructReader`` or ``_DynamicStructBuilder`` returns an instance
-    of this class.  The type parameter captures the possible string values of
-    the enum so that ``_as_str()`` returns a narrow ``Literal`` type.
+    of this class.
     """
     @property
     def raw(self) -> int: ...
-    def _as_str(self) -> _EnumStr: ...
+    def _as_str(self) -> str: ...
     @property
     def _parent(self) -> _DynamicStructReader | _DynamicStructBuilder | None: ...
     def __eq__(self, other: object) -> bool: ...
