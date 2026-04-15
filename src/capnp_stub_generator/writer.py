@@ -140,6 +140,9 @@ class Writer:
         # Map list class name -> element setter type (for list field setters)
         self._list_element_setter_types: dict[str, str] = {}
 
+        # Map enum alias name -> DynamicEnum subclass name (e.g., "ButtonTypeEnum" -> "ButtonTypeDynamicEnum")
+        self._enum_dynamic_class_names: dict[str, str] = {}
+
         self.docstring: str = f'"""This is an automatically generated stub for `{self._module_path.name}`."""'
 
     def _extract_name_from_protocol(self, protocol_name: str) -> str:
@@ -1497,12 +1500,12 @@ class Writer:
 
         # Enum values are integers at runtime, but also accept string literals.
         # Reading an enum field from a Reader/Builder returns a _DynamicEnum instance,
-        # while setting accepts int | Literal[...] (the type alias).
+        # while setting accepts int | Literal[...] | _<Name>DynamicEnum (the type alias).
         try:
             type_name = self.get_type_name(field.slot.type)
 
-            # Reader enum type is _DynamicEnum (not Generic - matches runtime)
-            reader_enum_type = "_DynamicEnum"
+            # Use per-enum DynamicEnum subclass if available, otherwise fall back to _DynamicEnum
+            reader_enum_type = self._enum_dynamic_class_names.get(type_name, "_DynamicEnum")
 
             return helper.TypeHintedVariable(
                 helper.sanitize_name(field.name),
@@ -1751,6 +1754,10 @@ class Writer:
         # For nested enums, add to parent scope; for top-level enums, add to root scope
         target_scope = enum_parent_scope if (enum_parent_scope and not enum_parent_scope.is_root) else self.scope
         target_scope.add(f"{context.type_name}: {enum_class_name}")
+
+        # Register DynamicEnum subclass for this enum
+        dynamic_class_name = f"{flat_name}DynamicEnum"
+        self._enum_dynamic_class_names[alias_name] = dynamic_class_name
 
         # Track for top-level annotations
         # For enums, we store the enum values to generate the type alias
@@ -3959,7 +3966,10 @@ class Writer:
                     # E.g., "CarParams.SafetyModel" -> "CarParamsSafetyModelEnum"
                     parts = definition_name.split(".")
                     alias_name = "".join(parts) + "Enum"
-                    self._add_import(f"from {python_import_path} import {alias_name}")
+                    dynamic_class_name = f"{''.join(parts)}DynamicEnum"
+                    self._add_import(f"from {python_import_path} import {alias_name}, {dynamic_class_name}")
+                    self._enum_dynamic_class_names[alias_name] = dynamic_class_name
+                    self._imported_aliases.add(dynamic_class_name)
                     return self.register_type(schema.node.id, schema, name=alias_name, scope=self.scope.root)
         else:
             # Regular non-nested import
@@ -3982,9 +3992,12 @@ class Writer:
                     # Register with Protocol name for internal type references
                     return self.register_type(schema.node.id, schema, name=protocol_name, scope=self.scope.root)
                 else:
-                    # Enums just need the enum itself
+                    # Enums: import the enum alias and DynamicEnum subclass
                     alias_name = f"{definition_name}Enum"
-                    self._add_import(f"from {python_import_path} import {alias_name}")
+                    dynamic_class_name = f"{definition_name}DynamicEnum"
+                    self._add_import(f"from {python_import_path} import {alias_name}, {dynamic_class_name}")
+                    self._enum_dynamic_class_names[alias_name] = dynamic_class_name
+                    self._imported_aliases.add(dynamic_class_name)
                     return self.register_type(schema.node.id, schema, name=alias_name, scope=self.scope.root)
             else:
                 # Structs: import the Protocol class (_<Name>StructModule) for internal type references
@@ -4437,6 +4450,16 @@ class Writer:
 
         out.extend(self.scope.lines)
 
+        # Add DynamicEnum subclasses for per-enum type safety (skip imported ones)
+        local_dynamic_classes = sorted(
+            set(self._enum_dynamic_class_names.values()) - self._imported_aliases
+        )
+        if local_dynamic_classes:
+            out.append("")
+            out.append("# Per-enum _DynamicEnum subclasses for type-safe getter→setter copy")
+            for dynamic_class_name in local_dynamic_classes:
+                out.append(f"class {dynamic_class_name}(_DynamicEnum): ...")
+
         # Add top-level TypeAliases for all Reader/Builder/Client types
         # For enums, add instance annotations instead of type aliases
         # This allows using these types in type annotations even though module types are now variables
@@ -4450,10 +4473,13 @@ class Writer:
                     # Enum with values: (full_path, type_kind, enum_values)
                     full_path, type_kind, enum_values = alias_info
                     if type_kind == "Enum":
-                        # For enums, generate a single type alias that accepts int | Literal[...]
-                        # This allows both Operator.add (int) and string literals to be accepted
+                        # For enums, generate a type alias that accepts int | Literal[...] | _<Name>DynamicEnum
                         literal_values = ", ".join(f'"{v}"' for v in enum_values)
-                        out.append(f"type {alias_name} = int | typing.Literal[{literal_values}]")
+                        dynamic_class = self._enum_dynamic_class_names.get(alias_name)
+                        if dynamic_class:
+                            out.append(f"type {alias_name} = int | typing.Literal[{literal_values}] | {dynamic_class}")
+                        else:
+                            out.append(f"type {alias_name} = int | typing.Literal[{literal_values}]")
                     else:
                         # Regular type alias (use type statement for consistency)
                         out.append(f"type {alias_name} = {full_path}")

@@ -138,9 +138,9 @@ def test_cross_module_nested_enum_uses_flat_alias():
     # Should NOT use dotted variable path like Shared.Status
     assert "Shared.Status" not in user_content, "Should not use Shared.Status variable path"
 
-    # Reader getter should return _DynamicEnum
-    assert any("def status(self) -> _DynamicEnum" in line for line in user_lines), (
-        "Reader getter should return _DynamicEnum"
+    # Reader getter should return per-enum DynamicEnum subclass (imported from base module)
+    assert any("def status(self) -> SharedStatusDynamicEnum" in line for line in user_lines), (
+        "Reader getter should return per-enum DynamicEnum subclass"
     )
 
     # Builder setter should accept the flat alias
