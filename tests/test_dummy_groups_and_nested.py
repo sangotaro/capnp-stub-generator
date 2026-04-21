@@ -38,6 +38,7 @@ def test_nested_types_enums_and_lists(dummy_stub_lines):
     # Enum getter returns per-enum DynamicEnum subclass, setter uses the Enum type alias
     assert any("def outerNestedEnum(self) -> TestNestedTypesNestedEnum1DynamicEnum" in line for line in lines)
     assert any("def innerNestedEnum(self) -> TestNestedTypesNestedStructNestedEnum2DynamicEnum" in line for line in lines)
+    # Setter references the wide XxxEnum alias directly
     assert any("def outerNestedEnum(self, value: TestNestedTypesNestedEnum1Enum" in line for line in lines)
     assert any("def innerNestedEnum(self, value: TestNestedTypesNestedStructNestedEnum2Enum" in line for line in lines)
 

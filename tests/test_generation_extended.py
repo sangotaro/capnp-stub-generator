@@ -143,7 +143,7 @@ def test_cross_module_nested_enum_uses_flat_alias():
         "Reader getter should return per-enum DynamicEnum subclass"
     )
 
-    # Builder setter should accept the flat alias
+    # Builder setter references the wide SharedStatusEnum alias directly
     assert any("def status(self, value: SharedStatusEnum" in line for line in user_lines), (
         "Builder setter should accept SharedStatusEnum"
     )

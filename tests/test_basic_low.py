@@ -17,12 +17,15 @@ def test_enum_color_defined(basic_low_stub_lines):
     lines = basic_low_stub_lines
     # Enums are now generated as simple classes with int attributes
     assert any("class _ColorEnumModule(_EnumModule):" in line for line in lines)
-    # Enum values are int annotations
-    assert any("red: int" in line for line in lines)
-    assert any("green: int" in line for line in lines)
-    assert any("blue: int" in line for line in lines)
+    # Enum values are narrowed Literal[N] annotations
+    assert any("red: typing.Literal[0]" in line for line in lines)
+    assert any("green: typing.Literal[1]" in line for line in lines)
+    assert any("blue: typing.Literal[2]" in line for line in lines)
     # Type alias at top level with Literal values
-    assert any('type ColorEnum = int | typing.Literal["red", "green", "blue"]' in line for line in lines)
+    # Wide ColorEnum alias (setter input) + narrow ColorLiteral (attribute annotation)
+    # XxxEnum references XxxLiteral for DRY
+    assert any('type ColorLiteral = typing.Literal["red", "green", "blue"]' in line for line in lines)
+    assert any('type ColorEnum = int | ColorLiteral | ColorDynamicEnum' in line for line in lines)
 
 
 def test_basiclow_struct_and_fields(basic_low_stub_lines):

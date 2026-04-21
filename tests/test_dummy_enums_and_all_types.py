@@ -8,10 +8,12 @@ def test_enum_definition_and_imports(dummy_stub_lines):
     # Enums are now simple classes with int attributes
     assert any(line.strip().startswith("class _TestEnumEnumModule(_EnumModule):") for line in lines)
     # Type alias at top level (not instance annotation)
-    assert any(line.strip().startswith("type TestEnumEnum = int | typing.Literal[") for line in lines)
-    # Enum values are now int annotations (e.g., "foo: int")
-    for name in ["foo", "bar", "baz", "qux"]:
-        assert any(f"{name}: int" in line for line in lines)
+    # Wide TestEnumEnum alias (setter input) + narrow TestEnumLiteral (attribute annotation)
+    assert any(line.strip().startswith("type TestEnumLiteral = typing.Literal[") for line in lines)
+    assert any(line.strip() == "type TestEnumEnum = int | TestEnumLiteral | TestEnumDynamicEnum" for line in lines)
+    # Enum values are narrowed Literal[N] annotations
+    for i, name in enumerate(["foo", "bar", "baz", "qux"]):
+        assert any(f"{name}: typing.Literal[{i}]" in line for line in lines)
 
 
 def test_testalltypes_field_presence_and_collections_import(dummy_stub_lines):
