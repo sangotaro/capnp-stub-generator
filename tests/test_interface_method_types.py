@@ -214,7 +214,8 @@ class TestInterfaceMethodComplexTypes:
         # Nested: instance annotation for Calculator.Operator.add access
         assert "    Operator: _OperatorEnumModule" in stub_content  # Note the indentation
         # Top-level: type alias for annotations
-        assert 'type CalculatorOperatorEnum = int | CalculatorOperatorLiteral | CalculatorOperatorDynamicEnum' in stub_content
+        assert "class CalculatorOperatorEnum(_DynamicEnum):" in stub_content
+        assert 'type CalculatorOperatorLiteral = typing.Literal["add", "subtract", "multiply", "divide"]' in stub_content
 
     def test_list_parameter_types(self, generate_calculator_stubs):
         """Test that list parameters use Sequence with proper element types."""

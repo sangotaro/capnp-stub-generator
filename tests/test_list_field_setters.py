@@ -22,10 +22,10 @@ def test_enum_list_setter_accepts_sequence(basic_stubs):
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     content = stub_file.read_text()
 
-    # enumList: List(TopEnum) setter should accept Sequence of enum values
+    # enumList: List(TopEnum) setter inlines the enum input union per element
     assert (
         "def enumList(self, value: TopEnumEnumListBuilder | TopEnumEnumListReader "
-        "| Sequence[TopEnumEnum]"
+        "| Sequence[int | TopEnumLiteral | TopEnumEnum]"
     ) in content
 
 

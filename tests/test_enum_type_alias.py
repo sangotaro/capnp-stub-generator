@@ -1,239 +1,122 @@
-"""Test enum type alias generation and usage."""
+"""Test enum type generation and usage."""
 
 import subprocess
 
 
-def test_enum_type_alias_exists(calculator_stubs):
-    """Test that enum type aliases are generated."""
+def test_enum_types_exist(calculator_stubs):
+    """Test that XxxEnum class and XxxLiteral alias are generated."""
     stub_file = calculator_stubs / "calculator_capnp.pyi"
     content = stub_file.read_text()
 
-    # Check that the enum type alias exists (flattened name)
-    # Wide alias (setter input) + narrow Literal alias (attribute annotation)
+    # CalculatorOperatorEnum is the runtime class (narrow)
+    assert "class CalculatorOperatorEnum(_DynamicEnum):" in content
+    # CalculatorOperatorLiteral is the narrow str Literal alias
     assert 'type CalculatorOperatorLiteral = typing.Literal["add", "subtract", "multiply", "divide"]' in content
-    assert 'type CalculatorOperatorEnum = int | CalculatorOperatorLiteral | CalculatorOperatorDynamicEnum' in content
 
 
-def test_enum_type_alias_accepts_literals(calculator_stubs):
-    """Test that the Operator type accepts string literals."""
+def test_xxx_literal_accepts_valid_str(calculator_stubs):
+    """XxxLiteral (narrow str alias) accepts valid string literals."""
     test_code = '''
 import calculator_capnp
 
-def use_operator_literal(op: calculator_capnp.CalculatorOperatorEnum):
-    """Function that accepts Operator."""
+def use_operator(op: calculator_capnp.CalculatorOperatorLiteral):
     pass
 
-# Should accept string literals
-use_operator_literal("add")
-use_operator_literal("subtract")
-use_operator_literal("multiply")
-use_operator_literal("divide")
+use_operator("add")
+use_operator("subtract")
+use_operator("multiply")
+use_operator("divide")
 '''
 
-    test_file = calculator_stubs / "test_enum_literal_typing.py"
+    test_file = calculator_stubs / "test_literal_accepts_str.py"
     test_file.write_text(test_code)
 
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    error_count = result.stdout.count("error:")
-    assert error_count == 0, f"Type checking failed: {result.stdout}"
+    result = subprocess.run(["pyright", str(test_file)], capture_output=True, text=True)
+    assert result.stdout.count("error:") == 0, f"Type checking failed: {result.stdout}"
 
 
-def test_enum_type_alias_accepts_int(calculator_stubs):
-    """Test that XxxEnum (wide alias) accepts integer values."""
+def test_xxx_literal_rejects_int(calculator_stubs):
+    """XxxLiteral (narrow str alias) rejects integer values."""
     test_code = '''
 import calculator_capnp
 
-def use_operator_int(op: calculator_capnp.CalculatorOperatorEnum):
-    """Function that accepts Operator."""
+def use_operator(op: calculator_capnp.CalculatorOperatorLiteral):
     pass
 
-# Should accept integer values (XxxEnum is wide: int | Literal[str] | DynamicEnum)
-use_operator_int(0)
-use_operator_int(1)
-use_operator_int(2)
-use_operator_int(3)
+use_operator(0)
 '''
 
-    test_file = calculator_stubs / "test_enum_int_typing.py"
+    test_file = calculator_stubs / "test_literal_rejects_int.py"
     test_file.write_text(test_code)
 
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    error_count = result.stdout.count("error:")
-    assert error_count == 0, f"Type checking failed: {result.stdout}"
+    result = subprocess.run(["pyright", str(test_file)], capture_output=True, text=True)
+    assert result.stdout.count("error:") > 0, f"Expected error: {result.stdout}"
 
 
-def test_enum_literal_alias_rejects_int(calculator_stubs):
-    """Test that XxxLiteral (narrow str alias) rejects integer values."""
+def test_xxx_literal_rejects_invalid_str(calculator_stubs):
+    """XxxLiteral rejects strings not in the enum."""
     test_code = '''
 import calculator_capnp
 
-def use_operator_literal(op: calculator_capnp.CalculatorOperatorLiteral):
-    """Function that accepts str Literal only."""
+def use_operator(op: calculator_capnp.CalculatorOperatorLiteral):
     pass
 
-# Should reject integer values (XxxLiteral is str Literal only)
-use_operator_literal(0)
+use_operator("invalid")
 '''
 
-    test_file = calculator_stubs / "test_enum_literal_rejects_int.py"
+    test_file = calculator_stubs / "test_literal_rejects_invalid.py"
     test_file.write_text(test_code)
 
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    error_count = result.stdout.count("error:")
-    assert error_count > 0, f"Expected type errors for int on XxxLiteral: {result.stdout}"
+    result = subprocess.run(["pyright", str(test_file)], capture_output=True, text=True)
+    assert result.stdout.count("error:") > 0, f"Expected error for invalid literal: {result.stdout}"
 
 
-def test_enum_type_alias_accepts_enum_attribute(calculator_stubs):
-    """Test that XxxEnum accepts enum module int attributes."""
+def test_setter_union_accepts_all_forms(calculator_stubs):
+    """The inline setter union (int | XxxLiteral | XxxEnum) accepts all valid forms."""
     test_code = '''
 import calculator_capnp
 
-def use_operator_enum(op: calculator_capnp.CalculatorOperatorEnum):
-    """Function that accepts Operator."""
+# Function mirrors the setter signature shape
+def use_operator(
+    op: int
+    | calculator_capnp.CalculatorOperatorLiteral
+    | calculator_capnp.CalculatorOperatorEnum,
+) -> None:
     pass
 
-# Should accept enum attributes (which are Literal[N] int at runtime)
-use_operator_enum(calculator_capnp.Calculator.Operator.add)
-use_operator_enum(calculator_capnp.Calculator.Operator.subtract)
-use_operator_enum(calculator_capnp.Calculator.Operator.multiply)
-use_operator_enum(calculator_capnp.Calculator.Operator.divide)
+# Should accept int values
+use_operator(0)
+# Should accept enum module Literal[N] values
+use_operator(calculator_capnp.Calculator.Operator.add)
+# Should accept str literals
+use_operator("add")
+use_operator("subtract")
 '''
 
-    test_file = calculator_stubs / "test_enum_attr_typing.py"
+    test_file = calculator_stubs / "test_setter_union_accepts.py"
     test_file.write_text(test_code)
 
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    error_count = result.stdout.count("error:")
-    assert error_count == 0, f"Type checking failed: {result.stdout}"
+    result = subprocess.run(["pyright", str(test_file)], capture_output=True, text=True)
+    assert result.stdout.count("error:") == 0, f"Type checking failed: {result.stdout}"
 
 
-def test_enum_type_alias_rejects_invalid_literals(calculator_stubs):
-    """Test that the Operator rejects invalid string literals."""
+def test_setter_union_rejects_invalid_str(calculator_stubs):
+    """The inline setter union rejects strings not in the enum."""
     test_code = '''
 import calculator_capnp
 
-def use_operator(op: calculator_capnp.CalculatorOperatorEnum):
-    """Function that accepts Operator."""
+def use_operator(
+    op: int
+    | calculator_capnp.CalculatorOperatorLiteral
+    | calculator_capnp.CalculatorOperatorEnum,
+) -> None:
     pass
 
-# Should reject invalid string literals
-use_operator("invalid")  # type: ignore[arg-type]
+use_operator("invalid")
 '''
 
-    test_file = calculator_stubs / "test_enum_invalid_typing.py"
+    test_file = calculator_stubs / "test_setter_union_rejects_invalid.py"
     test_file.write_text(test_code)
 
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    # Should have one error for the invalid literal (but we're ignoring it)
-    # This test mainly documents the expected behavior
-    # The type: ignore comment should suppress the error
-    error_count = result.stdout.count("error:")
-    assert error_count == 0, f"Type checking failed unexpectedly: {result.stdout}"
-
-
-def test_enum_type_alias_in_class_init(calculator_stubs):
-    """Test using Operator in a class __init__ method (real-world example)."""
-    test_code = '''
-import calculator_capnp
-
-class OperatorImpl(calculator_capnp.Calculator.Function.Server):
-    """Implementation wrapping arithmetic operators."""
-
-    def __init__(self, op: calculator_capnp.CalculatorOperatorEnum):
-        self.op = op
-
-    async def call(self, params, _context, **kwargs):
-        assert len(params) == 2
-
-        op = self.op
-
-        if op == "add":
-            return params[0] + params[1]
-        elif op == "subtract":
-            return params[0] - params[1]
-        elif op == "multiply":
-            return params[0] * params[1]
-        elif op == "divide":
-            return params[0] / params[1]
-        else:
-            raise ValueError("Unknown operator")
-
-# Should accept all valid forms (XxxEnum is wide)
-impl1 = OperatorImpl("add")
-impl2 = OperatorImpl(calculator_capnp.Calculator.Operator.subtract)
-impl3 = OperatorImpl(0)
-'''
-
-    test_file = calculator_stubs / "test_enum_class_typing.py"
-    test_file.write_text(test_code)
-
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    error_count = result.stdout.count("error:")
-    assert error_count == 0, f"Type checking failed: {result.stdout}"
-
-
-def test_enum_comparison_with_literals(calculator_stubs):
-    """Test that enum values can be compared with string literals."""
-    test_code = '''
-import calculator_capnp
-
-def process_operator(op: calculator_capnp.CalculatorOperatorEnum) -> str:
-    """Process operator and return string description."""
-    if op == "add":
-        return "addition"
-    elif op == "subtract":
-        return "subtraction"
-    elif op == "multiply":
-        return "multiplication"
-    elif op == "divide":
-        return "division"
-    else:
-        return "unknown"
-
-# Test with different input types (XxxEnum is wide)
-result1 = process_operator("add")
-result2 = process_operator(calculator_capnp.Calculator.Operator.add)
-result3 = process_operator(0)
-'''
-
-    test_file = calculator_stubs / "test_enum_comparison_typing.py"
-    test_file.write_text(test_code)
-
-    result = subprocess.run(
-        ["pyright", str(test_file)],
-        capture_output=True,
-        text=True,
-    )
-
-    error_count = result.stdout.count("error:")
-    assert error_count == 0, f"Type checking failed: {result.stdout}"
+    result = subprocess.run(["pyright", str(test_file)], capture_output=True, text=True)
+    assert result.stdout.count("error:") > 0, f"Expected error: {result.stdout}"

@@ -138,12 +138,12 @@ def test_cross_module_nested_enum_uses_flat_alias():
     # Should NOT use dotted variable path like Shared.Status
     assert "Shared.Status" not in user_content, "Should not use Shared.Status variable path"
 
-    # Reader getter should return per-enum DynamicEnum subclass (imported from base module)
-    assert any("def status(self) -> SharedStatusDynamicEnum" in line for line in user_lines), (
-        "Reader getter should return per-enum DynamicEnum subclass"
+    # Reader getter returns the Enum class (imported from base module)
+    assert any("def status(self) -> SharedStatusEnum" in line for line in user_lines), (
+        "Reader getter should return Enum class"
     )
 
-    # Builder setter references the wide SharedStatusEnum alias directly
-    assert any("def status(self, value: SharedStatusEnum" in line for line in user_lines), (
-        "Builder setter should accept SharedStatusEnum"
+    # Builder setter inlines the full union: int | XxxLiteral | XxxEnum
+    assert any("int | SharedStatusLiteral | SharedStatusEnum" in line for line in user_lines), (
+        "Builder setter should inline the enum union"
     )

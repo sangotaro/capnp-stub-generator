@@ -22,10 +22,9 @@ def test_enum_color_defined(basic_low_stub_lines):
     assert any("green: typing.Literal[1]" in line for line in lines)
     assert any("blue: typing.Literal[2]" in line for line in lines)
     # Type alias at top level with Literal values
-    # Wide ColorEnum alias (setter input) + narrow ColorLiteral (attribute annotation)
-    # XxxEnum references XxxLiteral for DRY
+    # ColorEnum is the runtime class (was ColorDynamicEnum). ColorLiteral is the narrow alias.
+    assert any('class ColorEnum(_DynamicEnum):' in line for line in lines)
     assert any('type ColorLiteral = typing.Literal["red", "green", "blue"]' in line for line in lines)
-    assert any('type ColorEnum = int | ColorLiteral | ColorDynamicEnum' in line for line in lines)
 
 
 def test_basiclow_struct_and_fields(basic_low_stub_lines):

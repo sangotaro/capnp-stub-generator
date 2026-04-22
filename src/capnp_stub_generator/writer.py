@@ -140,11 +140,9 @@ class Writer:
         # Map list class name -> element setter type (for list field setters)
         self._list_element_setter_types: dict[str, str] = {}
 
-        # Map enum alias name -> DynamicEnum subclass name (e.g., "ButtonTypeEnum" -> "ButtonTypeDynamicEnum")
-        self._enum_dynamic_class_names: dict[str, str] = {}
-
-        # Map DynamicEnum class name -> list of enum value names (for narrowing _as_str())
-        self._enum_dynamic_class_values: dict[str, list[str]] = {}
+        # Map Enum class name (e.g., "ButtonTypeEnum") -> list of enum value names
+        # Used to generate narrow _as_str(), __eq__, and the XxxLiteral alias.
+        self._enum_class_values: dict[str, list[str]] = {}
 
         self.docstring: str = f'"""This is an automatically generated stub for `{self._module_path.name}`."""'
 
@@ -613,10 +611,12 @@ class Writer:
             getter_type = field.primary_type_nested  # Protocol only
             setter_type = field.full_type_nested  # Protocol | Server
         elif field.has_type_hint_with_reader_affix and not field.has_type_hint_with_builder_affix:
-            # Enum fields: getter returns per-enum DynamicEnum subclass,
-            # setter accepts the wide XxxEnum union (int | Literal[str] | XxxDynamicEnum).
-            getter_type = field.get_type_with_affixes([helper.READER_NAME])
-            setter_type = field.primary_type_nested
+            # Enum fields: getter returns the XxxEnum class (runtime _DynamicEnum subclass),
+            # setter accepts int | XxxLiteral | XxxEnum inlined per field.
+            class_name = field.primary_type_nested
+            literal_name = class_name.removesuffix("Enum") + "Literal"
+            getter_type = class_name
+            setter_type = f"int | {literal_name} | {class_name}"
         else:
             # Primitive fields (including primitive lists)
             getter_type = field.primary_type_nested
@@ -865,8 +865,10 @@ class Writer:
                 if slot_field.has_type_hint_with_builder_affix:
                     field_type = slot_field.get_type_with_affixes(["Builder"])
                 elif slot_field.has_type_hint_with_reader_affix and not slot_field.has_type_hint_with_builder_affix:
-                    # Enum fields: use wide XxxEnum alias (int | Literal[str] | XxxDynamicEnum)
-                    field_type = slot_field.primary_type_nested
+                    # Enum fields: inline setter union (int | XxxLiteral | XxxEnum)
+                    class_name = slot_field.primary_type_nested
+                    literal_name = class_name.removesuffix("Enum") + "Literal"
+                    field_type = f"int | {literal_name} | {class_name}"
                 else:
                     field_type = slot_field.full_type_nested
                 # For struct fields, also accept dict for initialization
@@ -1234,9 +1236,11 @@ class Writer:
         elif element_which == capnp_types.CapnpElementType.ENUM:
             # Enum list
             enum_name = self.get_type_name(element_type)
+            literal_name = enum_name.removesuffix("Enum") + "Literal"
             reader_type = enum_name
             builder_type = enum_name
-            setter_type = enum_name
+            # Element setter accepts the full enum input union
+            setter_type = f"int | {literal_name} | {enum_name}"
 
             base_name = enum_name.replace(".", "_")
 
@@ -1502,19 +1506,18 @@ class Writer:
                 pass
 
         # Enum values are integers at runtime, but also accept string literals.
-        # Reading an enum field from a Reader/Builder returns a _DynamicEnum instance,
-        # while setting accepts int | Literal[...] | _<Name>DynamicEnum (the type alias).
+        # Reading an enum field from a Reader/Builder returns a _DynamicEnum instance.
+        # The generated XxxEnum class is a nominal _DynamicEnum subclass; it serves
+        # as both getter return type and (combined with Literal[int]/XxxLiteral inline)
+        # the setter input union.
         try:
             type_name = self.get_type_name(field.slot.type)
-
-            # Use per-enum DynamicEnum subclass if available, otherwise fall back to _DynamicEnum
-            reader_enum_type = self._enum_dynamic_class_names.get(type_name, "_DynamicEnum")
 
             return helper.TypeHintedVariable(
                 helper.sanitize_name(field.name),
                 [
                     helper.TypeHint(type_name, primary=True),
-                    helper.TypeHint(reader_enum_type, affix=helper.READER_NAME, flat_alias=True),
+                    helper.TypeHint(type_name, affix=helper.READER_NAME, flat_alias=True),
                 ],
             )
         except (AttributeError, TypeError):
@@ -1758,19 +1761,14 @@ class Writer:
         target_scope = enum_parent_scope if (enum_parent_scope and not enum_parent_scope.is_root) else self.scope
         target_scope.add(f"{context.type_name}: {enum_class_name}")
 
-        # Register DynamicEnum subclass for this enum
-        dynamic_class_name = f"{flat_name}DynamicEnum"
-        self._enum_dynamic_class_names[alias_name] = dynamic_class_name
-        self._enum_dynamic_class_values[dynamic_class_name] = enum_values
+        # The registered alias_name is the Enum class name (e.g., "GnssFixEnum").
+        # This class is a _DynamicEnum subclass emitted at module level by dumps_pyi.
+        self._enum_class_values[alias_name] = enum_values
         # Narrow _as_str() uses @typing.override
         if enum_values:
             self._add_typing_import("override")
 
-        # Track for top-level annotations
-        # For enums, we store the enum values to generate the type alias
-        # Suffix with Enum to make it clear it's a type alias
-        self._all_type_aliases[alias_name] = (new_type.scoped_name, "Enum", enum_values)
-        # Also register XxxLiteral (narrow str Literal alias for attribute annotations)
+        # Register XxxLiteral (narrow str Literal alias for attribute annotations).
         literal_alias = alias_name.removesuffix("Enum") + "Literal"
         self._all_type_aliases[literal_alias] = (new_type.scoped_name, "EnumLiteral", enum_values)
 
@@ -2296,15 +2294,17 @@ class Writer:
                 request_type = "AnyPointer"
                 self._needs_anypointer_alias = True
 
-            # Handle ENUM: use type alias
-            # Enum values are integers at runtime, but RPC accepts string literals
+            # Handle ENUM: use the Enum class plus inline int | XxxLiteral union
+            # pycapnp accepts int, str literals, or the Enum class instance at runtime
             elif field_type == capnp_types.CapnpElementType.ENUM:
-                # Get enum type to extract name
                 try:
                     type_name = self.get_type_name(field_obj.slot.type)
-                    client_type = type_name
+                    literal_name = type_name.removesuffix("Enum") + "Literal"
+                    client_type = f"int | {literal_name} | {type_name}"
+                    # Server receives the runtime Enum instance
                     server_type = type_name
-                    request_type = type_name
+                    # Request fields accept the same wide union as the client
+                    request_type = client_type
                 except Exception as e:
                     logger.debug(f"Could not proces enum type for {param_name}: {e}")
                     # Fallback
@@ -3972,25 +3972,22 @@ class Writer:
                         schema.node.id, schema, name=protocol_definition_name, scope=self.scope.root
                     )
                 else:
-                    # For nested enums, use the flat type alias from the other module
-                    # E.g., "CarParams.SafetyModel" -> "CarParamsSafetyModelEnum"
+                    # For nested enums, import the flat Enum class + XxxLiteral from the other module.
+                    # E.g., "CarParams.SafetyModel" -> "CarParamsSafetyModelEnum" (class) +
+                    # "CarParamsSafetyModelLiteral".
                     parts = definition_name.split(".")
                     flat = "".join(parts)
-                    alias_name = f"{flat}Enum"
-                    dynamic_class_name = f"{flat}DynamicEnum"
+                    class_name = f"{flat}Enum"
                     literal_alias = f"{flat}Literal"
-                    self._add_import(
-                        f"from {python_import_path} import {alias_name}, {dynamic_class_name}, {literal_alias}"
-                    )
-                    self._enum_dynamic_class_names[alias_name] = dynamic_class_name
-                    self._imported_aliases.add(dynamic_class_name)
-                    # Capture enum values for building setter unions locally
+                    self._add_import(f"from {python_import_path} import {class_name}, {literal_alias}")
+                    self._imported_aliases.add(class_name)
+                    # Capture enum values so we can reference XxxLiteral when needed
                     try:
                         values = [e.name for e in schema.node.enum.enumerants]
-                        self._enum_dynamic_class_values[dynamic_class_name] = values
+                        self._enum_class_values[class_name] = values
                     except (AttributeError, TypeError):
                         pass
-                    return self.register_type(schema.node.id, schema, name=alias_name, scope=self.scope.root)
+                    return self.register_type(schema.node.id, schema, name=class_name, scope=self.scope.root)
         else:
             # Regular non-nested import
             node_type = schema.node.which()
@@ -4012,22 +4009,18 @@ class Writer:
                     # Register with Protocol name for internal type references
                     return self.register_type(schema.node.id, schema, name=protocol_name, scope=self.scope.root)
                 else:
-                    # Enums: import XxxEnum, XxxDynamicEnum, XxxLiteral
-                    alias_name = f"{definition_name}Enum"
-                    dynamic_class_name = f"{definition_name}DynamicEnum"
+                    # Enums: import the XxxEnum class and XxxLiteral alias
+                    class_name = f"{definition_name}Enum"
                     literal_alias = f"{definition_name}Literal"
-                    self._add_import(
-                        f"from {python_import_path} import {alias_name}, {dynamic_class_name}, {literal_alias}"
-                    )
-                    self._enum_dynamic_class_names[alias_name] = dynamic_class_name
-                    self._imported_aliases.add(dynamic_class_name)
-                    # Capture enum values for building setter unions locally
+                    self._add_import(f"from {python_import_path} import {class_name}, {literal_alias}")
+                    self._imported_aliases.add(class_name)
+                    # Capture enum values so we can reference XxxLiteral when needed
                     try:
                         values = [e.name for e in schema.node.enum.enumerants]
-                        self._enum_dynamic_class_values[dynamic_class_name] = values
+                        self._enum_class_values[class_name] = values
                     except (AttributeError, TypeError):
                         pass
-                    return self.register_type(schema.node.id, schema, name=alias_name, scope=self.scope.root)
+                    return self.register_type(schema.node.id, schema, name=class_name, scope=self.scope.root)
             else:
                 # Structs: import the Protocol class (_<Name>StructModule) for internal type references
                 # The TypeAlias can be accessed if needed, but internal references use the Protocol
@@ -4479,27 +4472,23 @@ class Writer:
 
         out.extend(self.scope.lines)
 
-        # Add DynamicEnum subclasses for per-enum type safety (skip imported ones)
-        local_dynamic_classes = sorted(
-            set(self._enum_dynamic_class_names.values()) - self._imported_aliases
-        )
-        if local_dynamic_classes:
+        # Add per-enum Enum subclasses for type-safe getter/setter (skip imported ones)
+        local_enum_classes = sorted(set(self._enum_class_values.keys()) - self._imported_aliases)
+        if local_enum_classes:
             out.append("")
-            out.append("# Per-enum _DynamicEnum subclasses for type-safe getter→setter copy")
-            for dynamic_class_name in local_dynamic_classes:
-                values = self._enum_dynamic_class_values.get(dynamic_class_name)
+            out.append("# Per-enum _DynamicEnum subclasses (getter return type, setter input)")
+            for class_name in local_enum_classes:
+                values = self._enum_class_values.get(class_name)
                 if values:
-                    literal_alias = dynamic_class_name.removesuffix("DynamicEnum") + "Literal"
-                    out.append(f"class {dynamic_class_name}(_DynamicEnum):")
+                    literal_alias = class_name.removesuffix("Enum") + "Literal"
+                    out.append(f"class {class_name}(_DynamicEnum):")
                     out.append("    @typing.override")
                     out.append(f"    def _as_str(self) -> {literal_alias}: ...")
-                    # Narrow __eq__ for cross-enum detection. str/int Literal overloads
-                    # would be defeated by the RHS fallback (str.__eq__(object) /
-                    # int.__eq__(object)), so only the DynamicEnum narrow is useful.
-                    # Intentionally narrower than base _DynamicEnum.__eq__(object).
-                    out.append(f"    def __eq__(self, other: {dynamic_class_name}) -> bool: ...  # pyright: ignore[reportIncompatibleMethodOverride]")
+                    # __eq__ is inherited from _DynamicEnum.__eq__(object) to match runtime
+                    # behavior and let `x in enum_list_reader` work via iteration + __eq__
+                    # fallback. Cross-enum comparisons are NOT detected as type errors.
                 else:
-                    out.append(f"class {dynamic_class_name}(_DynamicEnum): ...")
+                    out.append(f"class {class_name}(_DynamicEnum): ...")
 
         # Add top-level TypeAliases for all Reader/Builder/Client types
         # For enums, add instance annotations instead of type aliases
@@ -4513,17 +4502,7 @@ class Writer:
                 if len(alias_info) == 3:
                     # Enum with values: (full_path, type_kind, enum_values)
                     full_path, type_kind, enum_values = alias_info
-                    if type_kind == "Enum":
-                        # XxxEnum: wide union (setter/function param input).
-                        # XxxLiteral is registered as a separate alias (output below in sorted order).
-                        # PEP 695 type statement is lazy-evaluated so forward references work.
-                        literal_alias = alias_name.removesuffix("Enum") + "Literal"
-                        dynamic_class = self._enum_dynamic_class_names.get(alias_name)
-                        if dynamic_class:
-                            out.append(f"type {alias_name} = int | {literal_alias} | {dynamic_class}")
-                        else:
-                            out.append(f"type {alias_name} = int | {literal_alias}")
-                    elif type_kind == "EnumLiteral":
+                    if type_kind == "EnumLiteral":
                         # XxxLiteral: narrow str Literal for attribute annotations
                         literal_values = ", ".join(f'"{v}"' for v in enum_values)
                         out.append(f"type {alias_name} = typing.Literal[{literal_values}]")

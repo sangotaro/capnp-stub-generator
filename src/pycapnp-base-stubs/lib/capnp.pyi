@@ -1570,6 +1570,15 @@ class _DynamicListReader:
     def __getitem__(self, index: int) -> Any: ...
     def __iter__(self) -> Iterator[Any]: ...
 
+    # ---- Stub-only (not present at runtime) ----
+    # __contains__ is NOT defined on the runtime _DynamicListReader; Python's
+    # `in` operator falls back to iteration + __eq__. This stub declares
+    # __contains__(object) purely so type checkers accept `x in list_reader`
+    # for any x (matching the effective runtime behavior via iteration).
+    # Calling `list_reader.__contains__(x)` directly raises AttributeError
+    # at runtime.
+    def __contains__(self, x: object) -> bool: ...
+
 class _DynamicOrphan:
     """Orphaned Cap'n Proto message.
 
