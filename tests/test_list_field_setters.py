@@ -6,14 +6,14 @@ import subprocess
 
 
 def test_struct_list_setter_accepts_sequence(basic_stubs):
-    """Struct list field setter should accept Sequence[Reader | Builder | dict]."""
+    """Struct list field setter should accept Sequence[Reader | Builder | TypedDict]."""
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     content = stub_file.read_text()
 
     # nestedList: List(Nested) setter should accept Sequence of element types
     assert (
         "def nestedList(self, value: NestedListBuilder | NestedListReader "
-        "| Sequence[MidFeatureContainerNestedReader | MidFeatureContainerNestedBuilder | dict[str, typing.Any]]"
+        "| Sequence[MidFeatureContainerNestedReader | MidFeatureContainerNestedBuilder | MidFeatureContainerNestedDict]"
     ) in content
 
 

@@ -62,13 +62,13 @@ class TestStructReturnTypes:
         )
 
     def test_builder_setter_accepts_union(self, dummy_stub_file):
-        """Builder class setters should accept Builder, Reader, or dict types (not base)."""
+        """Builder class setters should accept Builder, Reader, or TypedDict types (not base)."""
         content = dummy_stub_file.read_text()
 
-        # Builder setter should accept Builder/Reader + dict (may be formatted across multiple lines)
+        # Builder setter should accept Builder/Reader + TypedDict (may be formatted across multiple lines)
         assert "@structField.setter" in content
-        assert "value: TestAllTypesBuilder | TestAllTypesReader | dict[str, typing.Any]" in content, (
-            "Builder setter should accept union of Builder, Reader, and dict types (not base)"
+        assert "value: TestAllTypesBuilder | TestAllTypesReader | TestAllTypesDict" in content, (
+            "Builder setter should accept union of Builder, Reader, and TypedDict types (not base)"
         )
 
     def test_list_fields_follow_same_pattern(self, dummy_stub_file):

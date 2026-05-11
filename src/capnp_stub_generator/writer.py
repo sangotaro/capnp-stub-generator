@@ -70,6 +70,7 @@ class Writer:
         "MutableSequence",
         "IO",
         "Callable",
+        "TypedDict",
     ]
 
     def __init__(
@@ -143,6 +144,11 @@ class Writer:
         # Map Enum class name (e.g., "ButtonTypeEnum") -> list of enum value names
         # Used to generate narrow _as_str(), __eq__, and the XxxLiteral alias.
         self._enum_class_values: dict[str, list[str]] = {}
+
+        # TypedDict support: map builder_type_name -> dict_type_name (e.g., "PersonBuilder" -> "PersonDict")
+        self._builder_to_dict_type: dict[str, str] = {}
+        # TypedDict definitions: dict_type_name -> list of (field_name, field_type) tuples
+        self._typed_dict_definitions: dict[str, list[tuple[str, str]]] = {}
 
         self.docstring: str = f'"""This is an automatically generated stub for `{self._module_path.name}`."""'
 
@@ -530,6 +536,103 @@ class Writer:
             # Primitive and other fields with their primary type
             return field.primary_type_nested
 
+    def _get_typed_dict_field_type(self, field: helper.TypeHintedVariable) -> str:
+        """Determine the TypedDict field type for a struct field.
+
+        Args:
+            field: The field to get the TypedDict type for
+
+        Returns:
+            Type string appropriate for a TypedDict field
+        """
+        # Special types -> Any
+        if field.is_generic_param or field.is_any_pointer or field.is_any_struct or field.is_any_list or field.is_capability:
+            self._add_typing_import("Any")
+            return "typing.Any"
+
+        # Enum fields: use primary type alias (int | Literal[...])
+        if field.has_type_hint_with_reader_affix and not field.has_type_hint_with_builder_affix:
+            return field.primary_type_nested
+
+        # Struct fields (non-list): Builder | Reader | Dict
+        if field.has_type_hint_with_builder_affix:
+            builder_type = field.get_type_with_affixes([helper.BUILDER_NAME])
+            reader_type = field.get_type_with_affixes([helper.READER_NAME])
+
+            if field.list_element_setter_type:
+                # List field with wrapper class: use the list types + Sequence[element]
+                # Replace dict[str, typing.Any] in element setter type with TypedDict if available
+                element_setter = self._replace_dict_with_typed_dict(field.list_element_setter_type)
+                self._add_typing_import("Sequence")
+                return f"{builder_type} | {reader_type} | Sequence[{element_setter}]"
+
+            if field.nesting_depth == 0:
+                # Non-list struct field
+                dict_type = self._builder_to_dict_type.get(builder_type)
+                if dict_type:
+                    return f"{builder_type} | {reader_type} | {dict_type}"
+                else:
+                    self._add_typing_import("Any")
+                    return f"{builder_type} | {reader_type} | dict[str, typing.Any]"
+
+            # List of structs (nesting_depth >= 1, no wrapper class)
+            dict_type = self._builder_to_dict_type.get(builder_type)
+            if dict_type:
+                self._add_typing_import("Sequence")
+                return f"Sequence[{builder_type} | {reader_type} | {dict_type}]"
+            else:
+                self._add_typing_import("Sequence")
+                self._add_typing_import("Any")
+                return f"Sequence[{builder_type} | {reader_type} | dict[str, typing.Any]]"
+
+        # Primitive fields
+        return field.primary_type_nested
+
+    def _replace_dict_with_typed_dict(self, type_str: str) -> str:
+        """Replace dict[str, typing.Any] in a type string with the appropriate TypedDict if available.
+
+        Looks for builder type names in the type string and replaces adjacent dict[str, typing.Any]
+        with the corresponding TypedDict name.
+
+        Args:
+            type_str: The type string potentially containing dict[str, typing.Any]
+
+        Returns:
+            The type string with dict replaced by TypedDict where possible
+        """
+        if "dict[str, typing.Any]" not in type_str:
+            return type_str
+
+        # Find which builder type is in this string to look up the corresponding dict type
+        for builder_name, dict_name in self._builder_to_dict_type.items():
+            if builder_name in type_str:
+                return type_str.replace("dict[str, typing.Any]", dict_name)
+
+        return type_str
+
+    def _generate_typed_dict_for_struct(
+        self,
+        context: StructGenerationContext,
+        fields_collection: StructFieldsCollection,
+    ) -> None:
+        """Generate a TypedDict definition for a struct.
+
+        Args:
+            context: The struct generation context
+            fields_collection: The processed fields collection
+        """
+        # Dict type name is already registered in gen_struct (early registration)
+        dict_type_name = self._builder_to_dict_type[context.builder_type_name]
+
+        # Compute field types
+        fields: list[tuple[str, str]] = []
+        for slot_field in fields_collection.slot_fields:
+            field_type = self._get_typed_dict_field_type(slot_field)
+            fields.append((slot_field.name, field_type))
+
+        self._typed_dict_definitions[dict_type_name] = fields
+        self._add_typing_import("TypedDict")
+
     def _get_builder_property_types(self, field: helper.TypeHintedVariable) -> tuple[str, str | None]:
         """Determine getter and setter types for Builder class fields.
 
@@ -588,24 +691,34 @@ class Writer:
                 if "Sequence[" in getter_type:
                     getter_type = getter_type.replace("Sequence[", "MutableSequence[")
                     self._add_typing_import("MutableSequence")
-                # Setter accepts Builder/Reader types + dict, but NOT the base type
+                # Setter accepts Builder/Reader types + TypedDict, but NOT the base type
                 setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
-                setter_type = field.get_type_with_affixes(setter_types) + " | Sequence[dict[str, typing.Any]]"
+                builder_type_for_lookup = field.get_type_with_affixes([helper.BUILDER_NAME])
+                dict_type = self._builder_to_dict_type.get(builder_type_for_lookup)
+                if dict_type:
+                    setter_type = field.get_type_with_affixes(setter_types) + f" | Sequence[{dict_type}]"
+                else:
+                    setter_type = field.get_type_with_affixes(setter_types) + " | Sequence[dict[str, typing.Any]]"
+                    self._add_typing_import("Any")
                 self._add_typing_import("Sequence")
-                self._add_typing_import("Any")
             elif field.list_element_setter_type:
                 # List fields with wrapper classes: setter accepts ListBuilder/ListReader + Sequence of elements
                 getter_type = field.get_type_with_affixes([helper.BUILDER_NAME])
                 setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
-                setter_type = field.get_type_with_affixes(setter_types) + f" | Sequence[{field.list_element_setter_type}]"
+                element_setter = self._replace_dict_with_typed_dict(field.list_element_setter_type)
+                setter_type = field.get_type_with_affixes(setter_types) + f" | Sequence[{element_setter}]"
                 self._add_typing_import("Sequence")
-                self._add_typing_import("Any")
             else:
-                # For non-list structs: setter accepts Builder/Reader + dict
+                # For non-list structs: setter accepts Builder/Reader + TypedDict
                 getter_type = field.get_type_with_affixes([helper.BUILDER_NAME])
                 setter_types = [helper.BUILDER_NAME, helper.READER_NAME]
-                setter_type = field.get_type_with_affixes(setter_types) + " | dict[str, typing.Any]"
-                self._add_typing_import("Any")
+                builder_type_for_lookup = field.get_type_with_affixes([helper.BUILDER_NAME])
+                dict_type = self._builder_to_dict_type.get(builder_type_for_lookup)
+                if dict_type:
+                    setter_type = field.get_type_with_affixes(setter_types) + f" | {dict_type}"
+                else:
+                    setter_type = field.get_type_with_affixes(setter_types) + " | dict[str, typing.Any]"
+                    self._add_typing_import("Any")
         # For interface fields: getter returns Protocol, setter accepts Protocol | Server
         elif len(field.type_hints) > 1 and any(".Server" in str(h) for h in field.type_hints):
             getter_type = field.primary_type_nested  # Protocol only
@@ -871,18 +984,25 @@ class Writer:
                     field_type = f"int | {literal_name} | {class_name}"
                 else:
                     field_type = slot_field.full_type_nested
-                # For struct fields, also accept dict for initialization
+                # For struct fields, also accept TypedDict for initialization
                 type_hints = [helper.TypeHint(field_type, primary=True)]
                 if slot_field.has_type_hint_with_builder_affix:
+                    dict_type = self._builder_to_dict_type.get(field_type)
                     if slot_field.nesting_depth == 0:
-                        # Non-list struct fields accept dict directly
-                        type_hints.append(helper.TypeHint("dict[str, typing.Any]"))
-                        self._add_typing_import("Any")
+                        # Non-list struct fields accept TypedDict directly
+                        if dict_type:
+                            type_hints.append(helper.TypeHint(dict_type))
+                        else:
+                            type_hints.append(helper.TypeHint("dict[str, typing.Any]"))
+                            self._add_typing_import("Any")
                     elif slot_field.nesting_depth == 1:
-                        # List of struct fields accept Sequence[dict]
-                        type_hints.append(helper.TypeHint("Sequence[dict[str, typing.Any]]"))
+                        # List of struct fields accept Sequence[TypedDict]
+                        if dict_type:
+                            type_hints.append(helper.TypeHint(f"Sequence[{dict_type}]"))
+                        else:
+                            type_hints.append(helper.TypeHint("Sequence[dict[str, typing.Any]]"))
+                            self._add_typing_import("Any")
                         self._add_typing_import("Sequence")
-                        self._add_typing_import("Any")
                 type_hints.append(helper.TypeHint("None"))
 
             # Make field optional since not all fields need to be set
@@ -1196,9 +1316,13 @@ class Writer:
             reader_type = reader_alias or self._build_nested_reader_type(struct_name)
             builder_type = builder_alias or self._build_scoped_builder_type(struct_name)
 
-            # Setter accepts Reader, Builder, or dict
-            setter_type = f"{reader_type} | {builder_type} | dict[str, typing.Any]"
-            self._add_typing_import("Any")
+            # Setter accepts Reader, Builder, or TypedDict
+            dict_type = self._builder_to_dict_type.get(builder_type)
+            if dict_type:
+                setter_type = f"{reader_type} | {builder_type} | {dict_type}"
+            else:
+                setter_type = f"{reader_type} | {builder_type} | dict[str, typing.Any]"
+                self._add_typing_import("Any")
 
             # Base name for list class (sanitize dots)
             # Use only the last component to avoid scoped names in list class
@@ -2186,11 +2310,18 @@ class Writer:
         self._all_type_aliases[context.reader_type_name] = (context.scoped_reader_type_name, "Reader")
         self._all_type_aliases[context.builder_type_name] = (context.scoped_builder_type_name, "Builder")
 
+        # Register TypedDict name early so nested types can reference it during field processing
+        dict_type_name = context.builder_type_name.removesuffix("Builder") + "Dict"
+        self._builder_to_dict_type[context.builder_type_name] = dict_type_name
+
         # Phase 2: Generate nested types (must be done before field processing)
         self._generate_nested_types(schema)
 
         # Phase 3: Process all struct fields
         fields_collection = self._process_struct_fields(schema, context)
+
+        # Phase 3.5: Generate TypedDict definition for this struct
+        self._generate_typed_dict_for_struct(context, fields_collection)
 
         # Phase 4: Generate the Protocol with nested Protocols and TypeAliases
         self._generate_struct_classes(context, fields_collection, protocol_declaration)
@@ -4027,12 +4158,18 @@ class Writer:
                 protocol_name = f"_{definition_name}StructModule"
                 reader_alias = f"{definition_name}Reader"
                 builder_alias = f"{definition_name}Builder"
+                dict_alias = f"{definition_name}Dict"
 
-                self._add_import(f"from {python_import_path} import {protocol_name}, {reader_alias}, {builder_alias}")
+                self._add_import(
+                    f"from {python_import_path} import {protocol_name}, {reader_alias}, {builder_alias}, {dict_alias}"
+                )
 
                 # Track imported aliases
                 self._imported_aliases.add(reader_alias)
                 self._imported_aliases.add(builder_alias)
+
+                # Register TypedDict mapping for cross-module references
+                self._builder_to_dict_type[builder_alias] = dict_alias
 
                 # Register the type with the Protocol name so scoped_name returns the Protocol name
                 return self.register_type(schema.node.id, schema, name=protocol_name, scope=self.scope.root)
@@ -4514,6 +4651,18 @@ class Writer:
                     full_path, type_kind = alias_info
                     # All types use type alias now
                     out.append(f"type {alias_name} = {full_path}")
+
+        # Add TypedDict definitions for struct types
+        if self._typed_dict_definitions:
+            out.append("")
+            out.append("# TypedDict definitions for type-safe dict passing")
+            for dict_name, fields in sorted(self._typed_dict_definitions.items()):
+                out.append(f"class {dict_name}(typing.TypedDict, total=False):")
+                if fields:
+                    for field_name, field_type in fields:
+                        out.append(f"    {field_name}: {field_type}")
+                else:
+                    out.append("    ...")
 
         return "\n".join(out)
 
