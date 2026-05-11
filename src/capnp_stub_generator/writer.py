@@ -140,6 +140,8 @@ class Writer:
         self._generated_list_types: set[str] = set()
         # Map list class name -> element setter type (for list field setters)
         self._list_element_setter_types: dict[str, str] = {}
+        # Map list class name -> element narrow type (for TypedDict fields, no Builder/Reader)
+        self._list_element_narrow_types: dict[str, str] = {}
 
         # Map Enum class name (e.g., "ButtonTypeEnum") -> list of enum value names
         # Used to generate narrow _as_str(), __eq__, and the XxxLiteral alias.
@@ -550,40 +552,39 @@ class Writer:
             self._add_typing_import("Any")
             return "typing.Any"
 
-        # Enum fields: use primary type alias (int | Literal[...])
+        # Enum fields: narrow to Literal only (drop int and Enum class for invariance)
         if field.has_type_hint_with_reader_affix and not field.has_type_hint_with_builder_affix:
-            return field.primary_type_nested
+            class_name = field.primary_type_nested
+            return class_name.removesuffix("Enum") + "Literal"
 
-        # Struct fields (non-list): Builder | Reader | Dict
+        # Struct fields: narrow to the python-native input form only
+        # (drop Builder/Reader to keep TypedDict invariance friendly for consumers)
         if field.has_type_hint_with_builder_affix:
             builder_type = field.get_type_with_affixes([helper.BUILDER_NAME])
-            reader_type = field.get_type_with_affixes([helper.READER_NAME])
 
-            if field.list_element_setter_type:
-                # List field with wrapper class: use the list types + Sequence[element]
-                # Replace dict[str, typing.Any] in element setter type with TypedDict if available
-                element_setter = self._replace_dict_with_typed_dict(field.list_element_setter_type)
+            if field.list_element_narrow_type:
+                # List field with wrapper class: Sequence[narrow_element]
                 self._add_typing_import("Sequence")
-                return f"{builder_type} | {reader_type} | Sequence[{element_setter}]"
+                return f"Sequence[{field.list_element_narrow_type}]"
 
             if field.nesting_depth == 0:
                 # Non-list struct field
                 dict_type = self._builder_to_dict_type.get(builder_type)
                 if dict_type:
-                    return f"{builder_type} | {reader_type} | {dict_type}"
+                    return dict_type
                 else:
                     self._add_typing_import("Any")
-                    return f"{builder_type} | {reader_type} | dict[str, typing.Any]"
+                    return "dict[str, typing.Any]"
 
             # List of structs (nesting_depth >= 1, no wrapper class)
             dict_type = self._builder_to_dict_type.get(builder_type)
             if dict_type:
                 self._add_typing_import("Sequence")
-                return f"Sequence[{builder_type} | {reader_type} | {dict_type}]"
+                return f"Sequence[{dict_type}]"
             else:
                 self._add_typing_import("Sequence")
                 self._add_typing_import("Any")
-                return f"Sequence[{builder_type} | {reader_type} | dict[str, typing.Any]]"
+                return "Sequence[dict[str, typing.Any]]"
 
         # Primitive fields
         return field.primary_type_nested
@@ -1320,8 +1321,10 @@ class Writer:
             dict_type = self._builder_to_dict_type.get(builder_type)
             if dict_type:
                 setter_type = f"{reader_type} | {builder_type} | {dict_type}"
+                narrow_type = dict_type
             else:
                 setter_type = f"{reader_type} | {builder_type} | dict[str, typing.Any]"
+                narrow_type = "dict[str, typing.Any]"
                 self._add_typing_import("Any")
 
             # Base name for list class (sanitize dots)
@@ -1345,6 +1348,7 @@ class Writer:
 
             # Setter accepts Reader, Builder, or Sequence
             setter_type = f"{reader_type} | {builder_type} | Sequence[typing.Any]"
+            narrow_type = "Sequence[typing.Any]"
             self._add_typing_import("Sequence")
             self._add_typing_import("Any")
 
@@ -1365,6 +1369,7 @@ class Writer:
             builder_type = enum_name
             # Element setter accepts the full enum input union
             setter_type = f"int | {literal_name} | {enum_name}"
+            narrow_type = literal_name
 
             base_name = enum_name.replace(".", "_")
 
@@ -1385,6 +1390,7 @@ class Writer:
             reader_type = client_alias
             builder_type = client_alias
             setter_type = f"{client_alias} | {interface_name}.Server"
+            narrow_type = client_alias
 
             base_name = client_alias
 
@@ -1393,6 +1399,7 @@ class Writer:
             reader_type = "_DynamicObjectReader"
             builder_type = "_DynamicObjectBuilder"
             setter_type = "AnyPointer"
+            narrow_type = "AnyPointer"
             self._needs_anypointer_alias = True
             base_name = "AnyPointer"
 
@@ -1402,6 +1409,7 @@ class Writer:
             reader_type = python_type
             builder_type = python_type
             setter_type = python_type
+            narrow_type = python_type
             base_name = element_which.title()  # e.g. Int32
 
         # Construct list class name
@@ -1417,6 +1425,7 @@ class Writer:
 
         self._generated_list_types.add(list_class_name)
         self._list_element_setter_types[list_class_name] = setter_type
+        self._list_element_narrow_types[list_class_name] = narrow_type
 
         # Register in self._all_type_aliases
         self._all_type_aliases[reader_alias] = (f"{list_class_name}.Reader", "Reader")
@@ -1594,6 +1603,7 @@ class Writer:
 
         # Store element setter type for list field setters
         hinted_variable.list_element_setter_type = self._list_element_setter_types[list_class_name]
+        hinted_variable.list_element_narrow_type = self._list_element_narrow_types[list_class_name]
 
         return hinted_variable
 

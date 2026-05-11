@@ -164,6 +164,7 @@ class TypeHintedVariable:
     is_any_struct: bool = field(default=False, init=False)
     is_capability: bool = field(default=False, init=False)
     list_element_setter_type: str = field(default="", init=False)
+    list_element_narrow_type: str = field(default="", init=False)
 
     def __post_init__(self):
         """Sanity check for provided type hints."""
