@@ -1,6 +1,6 @@
 [project]
 name = "capnp-stub-generator"
-version = "0.0.24"
+version = "0.0.25"
 description = "Cap'n Proto stub generator"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "GPL-3.0-or-later" }
