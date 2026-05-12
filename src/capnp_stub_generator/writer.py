@@ -381,6 +381,13 @@ class Writer:
             if has_typing_names:
                 import_lines.append("import typing")
 
+        # ReadOnly is used on TypedDict fields so consumer-side total=True
+        # TypedDicts can be assigned to our total=False dicts despite TypedDict
+        # invariance (PEP 705). typing_extensions.ReadOnly works on 3.12+;
+        # typing.ReadOnly is 3.13+.
+        if self._typed_dict_definitions:
+            import_lines.append("from typing_extensions import ReadOnly")
+
         return import_lines
 
     # ===== Helper Methods for Type Name Manipulation =====
@@ -4670,7 +4677,7 @@ class Writer:
                 out.append(f"class {dict_name}(typing.TypedDict, total=False):")
                 if fields:
                     for field_name, field_type in fields:
-                        out.append(f"    {field_name}: {field_type}")
+                        out.append(f"    {field_name}: ReadOnly[{field_type}]")
                 else:
                     out.append("    ...")
 

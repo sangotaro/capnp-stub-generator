@@ -30,8 +30,8 @@ def test_struct_field_in_typed_dict_is_dict_only(basic_stubs):
     """Non-list struct field in TypedDict should be XxxDict, not Builder|Reader|XxxDict."""
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     block = _extract_typed_dict_block(stub_file.read_text(), "MidFeatureContainerDict")
-    assert "nested: MidFeatureContainerNestedDict" in block, (
-        f"Struct field should narrow to XxxDict only. Block:\n{block}"
+    assert "nested: ReadOnly[MidFeatureContainerNestedDict]" in block, (
+        f"Struct field should narrow to ReadOnly[XxxDict]. Block:\n{block}"
     )
     assert "Builder" not in block, f"TypedDict block must not contain Builder. Block:\n{block}"
     assert "Reader" not in block, f"TypedDict block must not contain Reader. Block:\n{block}"
@@ -41,8 +41,8 @@ def test_struct_list_field_in_typed_dict_is_sequence_of_dict(basic_stubs):
     """Struct list field in TypedDict should be Sequence[XxxDict]."""
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     block = _extract_typed_dict_block(stub_file.read_text(), "MidFeatureContainerDict")
-    assert "nestedList: Sequence[MidFeatureContainerNestedDict]" in block, (
-        f"Struct list should narrow to Sequence[XxxDict]. Block:\n{block}"
+    assert "nestedList: ReadOnly[Sequence[MidFeatureContainerNestedDict]]" in block, (
+        f"Struct list should narrow to ReadOnly[Sequence[XxxDict]]. Block:\n{block}"
     )
 
 
@@ -52,8 +52,8 @@ def test_primitive_list_field_in_typed_dict_is_sequence_of_primitive(basic_stubs
     block = _extract_typed_dict_block(
         stub_file.read_text(), "MidFeatureContainerMidFeatureContainerChoiceDict"
     )
-    assert "nums: Sequence[int]" in block, (
-        f"Primitive list should narrow to Sequence[primitive]. Block:\n{block}"
+    assert "nums: ReadOnly[Sequence[int]]" in block, (
+        f"Primitive list should narrow to ReadOnly[Sequence[primitive]]. Block:\n{block}"
     )
     assert "ListBuilder" not in block
     assert "ListReader" not in block
@@ -63,8 +63,8 @@ def test_enum_list_field_in_typed_dict_is_sequence_of_literal(basic_stubs):
     """Enum list field in TypedDict should be Sequence[XxxLiteral]."""
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     block = _extract_typed_dict_block(stub_file.read_text(), "MidFeatureContainerDict")
-    assert "enumList: Sequence[TopEnumLiteral]" in block, (
-        f"Enum list should narrow to Sequence[XxxLiteral]. Block:\n{block}"
+    assert "enumList: ReadOnly[Sequence[TopEnumLiteral]]" in block, (
+        f"Enum list should narrow to ReadOnly[Sequence[XxxLiteral]]. Block:\n{block}"
     )
     # The wide setter-style union must not appear in TypedDict
     assert "int |" not in block, f"TypedDict block must not contain enum-int union. Block:\n{block}"
@@ -75,8 +75,16 @@ def test_single_enum_field_in_typed_dict_is_literal(basic_stubs):
     """Single enum field in TypedDict should be XxxLiteral, not XxxEnum class."""
     stub_file = basic_stubs / "mid_features_capnp.pyi"
     block = _extract_typed_dict_block(stub_file.read_text(), "MidFeatureContainerDict")
-    assert "mode: TopEnumLiteral" in block, (
-        f"Single enum should narrow to XxxLiteral. Block:\n{block}"
+    assert "mode: ReadOnly[TopEnumLiteral]" in block, (
+        f"Single enum should narrow to ReadOnly[XxxLiteral]. Block:\n{block}"
+    )
+
+
+def test_readonly_import_emitted_when_typed_dict_present(basic_stubs):
+    """ReadOnly must be imported from typing_extensions when TypedDict is generated."""
+    content = (basic_stubs / "mid_features_capnp.pyi").read_text()
+    assert "from typing_extensions import ReadOnly" in content, (
+        "ReadOnly import is required when TypedDict definitions are present"
     )
 
 
